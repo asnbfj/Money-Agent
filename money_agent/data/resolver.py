@@ -314,6 +314,11 @@ def target_from_fund_code(code: str, settings: Settings, *, name: str = "") -> T
     )
 
 
+def fund_table(settings: Settings) -> pd.DataFrame:
+    """全部公募基金的代码、简称、类型（带磁盘缓存），供截图导入做名称匹配。"""
+    return _load_funds(settings)
+
+
 def find_fund_by_name(name: str, settings: Settings) -> dict | None:
     """按中文名称查基金，返回 {基金代码, 基金简称, 基金类型} 或 None。"""
     funds = _load_funds(settings)
