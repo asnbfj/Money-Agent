@@ -175,7 +175,7 @@
     .refresh-label i{width:6px;height:6px;border-radius:50%;background:var(--faint)}
     .refresh-label.loading i{background:var(--brass)!important;animation:pulse 1s infinite}
     @keyframes pulse{50%{opacity:.3}}
-    .table-scroll{overflow:auto}
+    .table-scroll{position:relative;overflow:auto}
     table{width:100%;border-collapse:collapse;white-space:nowrap}
     thead th{padding:9px 16px;text-align:right;font-size:12px;font-weight:500;color:var(--muted);background:var(--card-2);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
     thead th:first-child,tbody td:first-child{text-align:left;padding-left:22px}
@@ -300,6 +300,43 @@
     .review-tools .refresh-label{margin-top:0}
     .local-note{margin-top:12px;font-size:12px;line-height:1.7;color:var(--muted)}
 
+    /* 点钞机数字：每一位是一条 0–9 的竖向滚轮 */
+    .odo-cell{display:inline-block;height:1em;overflow:hidden;vertical-align:bottom}
+    .odo-strip{display:block;transition:transform .7s cubic-bezier(.2,.75,.25,1)}
+    .odo-strip>span{display:block;height:1em;line-height:1em;text-align:center}
+    .odo-sym{display:inline-block;line-height:1em;vertical-align:bottom}
+    .odo-cents{font-size:.5em;color:var(--ink-2)}
+    .odo-cell.odo-cents{margin-left:0}
+    .odo-cell{transition:color 1.2s ease}
+    .odo-cell.chg-up{color:var(--up);transition:none}
+    .odo-cell.chg-down{color:var(--down);transition:none}
+    .ledger-value.pending{color:var(--faint)}
+
+    /* 持有金额变动：底色闪一下 */
+    @keyframes tickUp{from{background:var(--up-soft)}to{background:transparent}}
+    @keyframes tickDown{from{background:var(--down-soft)}to{background:transparent}}
+    tbody td.tick-up{animation:tickUp 1.6s ease-out}
+    tbody td.tick-down{animation:tickDown 1.6s ease-out}
+
+    /* 入账印章：凹版蓝印油，避开代表上涨的红色 */
+    .stamp{position:absolute;z-index:3;left:calc(57.45% - 176px);top:26px;width:138px;height:138px;color:var(--accent);opacity:0;pointer-events:none;transform:rotate(-12deg)}
+    .stamp svg{width:100%;height:100%;overflow:visible}
+    .stamp circle{fill:none;stroke:currentColor}
+    .stamp text{fill:currentColor;font-family:var(--sans);text-anchor:middle}
+    .stamp .stamp-main{font-size:23px;font-weight:700;letter-spacing:3px}
+    .stamp .stamp-sub{font-size:10px;letter-spacing:1px}
+    .stamp.show{animation:stamp 3.4s cubic-bezier(.3,.7,.2,1) forwards}
+    @keyframes stamp{0%{opacity:0;transform:rotate(-22deg) scale(1.9)}9%{opacity:.9;transform:rotate(-12deg) scale(.95)}13%{transform:rotate(-12deg) scale(1)}78%{opacity:.9}100%{opacity:0;transform:rotate(-12deg) scale(1)}}
+    .donut circle{transition:stroke-dasharray .8s cubic-bezier(.3,.7,.2,1),stroke-dashoffset .8s cubic-bezier(.3,.7,.2,1)}
+    .alloc-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .activity-ico.down{background:var(--down)}
+    @media (prefers-reduced-motion:reduce){
+      .odo-strip,.donut circle{transition:none}
+      tbody td.tick-up,tbody td.tick-down{animation:none}
+      .stamp.show{animation:stampFade 2.6s forwards}
+      @keyframes stampFade{0%,75%{opacity:.9}100%{opacity:0}}
+    }
+
     /* 唯一的入场动效：花饰描线 */
     @media (prefers-reduced-motion:no-preference){
       .rosette path{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:engrave 1.6s cubic-bezier(.4,.1,.2,1) forwards;animation-delay:var(--delay,0s)}
@@ -316,10 +353,12 @@
       .ledger{grid-template-columns:1fr}
       .ledger-side{border-left:0;border-top:1px solid var(--rule);padding:6px 24px}
       .ledger-main{padding:24px 24px 22px;min-height:180px}
+      .stamp{left:auto;right:18px;top:16px;width:108px;height:108px}
       .layout,.bottom-grid{grid-template-columns:1fr}
     }
     @media (max-width:780px){
-      .app{grid-template-columns:1fr}
+      .app{grid-template-columns:minmax(0,1fr)}
+      .sidebar{min-width:0}
       .sidebar{position:relative;height:auto;padding:12px 16px 8px;border-right:0;border-bottom:1px solid var(--rule)}
       .brand{padding:0 0 10px}
       .watch-head,.watchlist,.side-bottom{display:none}
@@ -407,9 +446,10 @@
         <div class="ledger-main">
           <svg class="rosette" id="rosette" viewBox="-100 -100 200 200" aria-hidden="true"></svg>
           <div class="ledger-label">组合总资产</div>
-          <div class="ledger-value" id="totalValue">¥ 286,430<small>.52</small></div>
+          <div class="ledger-value pending" id="totalValue" aria-live="polite">¥ ——</div>
           <div class="ledger-foot" id="assetFoot">较上一交易日 <strong class="positive">+¥ 1,286.40（+0.45%）</strong></div>
         </div>
+        <div class="stamp" id="stamp" aria-hidden="true"><svg viewBox="-60 -60 120 120"><circle r="56" stroke-width="3"/><circle r="49" stroke-width="1" stroke-dasharray="2 3"/><text class="stamp-main" id="stampText" y="5">已入账</text><text class="stamp-sub" id="stampDate" y="29"></text><text class="stamp-sub" y="-24">基金项目部</text></svg></div>
         <dl class="ledger-side">
           <div class="ledger-row"><dt>累计收益</dt><dd><span class="ledger-num positive" id="totalPnl">+¥ 24,680.52</span><span class="ledger-sub">持有收益率 <strong class="positive" id="totalPnlPct">+9.43%</strong></span></dd></div>
           <div class="ledger-row"><dt>今日收益</dt><dd><span class="ledger-num positive" id="todayPnl">+¥ 1,286.40</span><span class="ledger-sub">估算日涨跌 <strong class="positive" id="todayChange">+0.45%</strong></span></dd></div>
@@ -593,14 +633,14 @@
       else importStatus.textContent='没有识别出基金。请上传持仓列表页的截图，或手动添加。';
       let detail=$('#ocrRaw');if(!detail){detail=document.createElement('details');detail.id='ocrRaw';detail.className='result-report';const summary=document.createElement('summary');summary.textContent='查看 OCR 识别原文';const pre=document.createElement('pre');detail.append(summary,pre);$('.import-modal .local-note').before(detail)}detail.querySelector('pre').textContent=payload.text||'没有识别到文字'}
     catch(err){importStatus.textContent=`${err.message}。确认服务已启动后，可手动添加持仓。`;candidateRows.replaceChildren();appendCandidate()}finally{e.target.value=''}});
-  $('#saveHoldings').addEventListener('click',async()=>{const holdings=[...candidateRows.rows].map(row=>Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value.trim()])));if(!holdings.length){importStatus.textContent='请先添加至少一只基金';return}if(holdings.some(item=>!/^\d{6}$/.test(item.fund_code)||!item.shares||Number(item.shares)<=0)){importStatus.textContent='请检查基金代码（6 位数字）和大于 0 的持有份额';return}const button=$('#saveHoldings');button.disabled=true;button.textContent='正在保存…';try{const response=await fetch('/api/holdings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({holdings})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'保存失败');importModal.classList.remove('open');$('#portfolioCaption').textContent='支付宝截图导入的持仓 · 估值按分钟自动刷新';$('#portfolioSelect').options[0].text='我的持仓';$('#exportBtn').lastElementChild.textContent='导出持仓';await refreshPortfolio();startPortfolioRefresh();toast(`已导入 ${payload.count} 只基金，开始获取最新估值`)}catch(err){importStatus.textContent=err.message}finally{button.disabled=false;button.textContent='确认导入'}});
+  $('#saveHoldings').addEventListener('click',async()=>{const holdings=[...candidateRows.rows].map(row=>Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value.trim()])));if(!holdings.length){importStatus.textContent='请先添加至少一只基金';return}if(holdings.some(item=>!/^\d{6}$/.test(item.fund_code)||!item.shares||Number(item.shares)<=0)){importStatus.textContent='请检查基金代码（6 位数字）和大于 0 的持有份额';return}const button=$('#saveHoldings');button.disabled=true;button.textContent='正在保存…';try{const response=await fetch('/api/holdings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({holdings})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'保存失败');importModal.classList.remove('open');$('#portfolioCaption').textContent='支付宝截图导入的持仓 · 估值按分钟自动刷新';$('#portfolioSelect').options[0].text='我的持仓';$('#exportBtn').lastElementChild.textContent='导出持仓';await refreshPortfolio();startPortfolioRefresh();stampLedger('已入账');toast(`已导入 ${payload.count} 只基金，开始获取最新估值`)}catch(err){importStatus.textContent=err.message}finally{button.disabled=false;button.textContent='确认导入'}});
 
   let refreshTimer=null,lastPortfolio=null,refreshInFlight=false,lastImported=false;
   const money=value=>value==null?'—':'¥ '+Number(value).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
   function applyDirection(element,value){element.classList.remove('positive','negative');if(value==null)return;element.classList.add(Number(value)>=0?'positive':'negative')}
-  function renderImportedPortfolio(data){lastPortfolio=data;lastImported=true;const rows=data.holdings||[];const body=$('#fundRows');body.replaceChildren();$('#allFunds').dataset.risk='all';$('#allFunds').textContent='全部基金　⌄';let pnlComplete=true;let dailyPnl=0;let dailyKnown=false;
+  function renderImportedPortfolio(data){if(!lastImported){const total=$('#totalValue');total.replaceChildren();delete total.dataset.value;$('#portfolioSelect').options[0].text='我的持仓';$('#exportBtn').lastElementChild.textContent='导出持仓'}lastPortfolio=data;lastImported=true;const rows=data.holdings||[];const body=$('#fundRows');body.replaceChildren();$('#allFunds').dataset.risk='all';$('#allFunds').textContent='全部基金　⌄';let pnlComplete=true;let dailyPnl=0;let dailyKnown=false;
     rows.forEach(item=>{const quote=item.quote||{},change=quote.change_pct;const tr=document.createElement('tr');tr.dataset.name=`${item.fund_name} ${item.fund_code}`.toLowerCase();const nameCell=document.createElement('td');const fundName=document.createElement('div');fundName.className='fund-name';const avatar=document.createElement('div');avatar.className='fund-avatar';avatar.textContent=(item.fund_name||'基').slice(0,1);const labels=document.createElement('div');const strong=document.createElement('strong');strong.textContent=item.fund_name||item.fund_code;const small=document.createElement('small');small.textContent=`${item.fund_code} · ${quote.nav_kind||'场外基金'}`;labels.append(strong,small);fundName.append(avatar,labels);nameCell.append(fundName);tr.append(nameCell);
-      const valueCell=document.createElement('td');valueCell.className='mono';valueCell.textContent=money(item.market_value);tr.append(valueCell);
+      const valueCell=document.createElement('td');valueCell.className='mono';valueCell.textContent=money(item.market_value);const prevValue=prevRowValues[item.fund_code];if(prevValue!=null&&item.market_value!=null&&Math.abs(prevValue-item.market_value)>=0.005)valueCell.classList.add(item.market_value>prevValue?'tick-up':'tick-down');tr.append(valueCell);
       const pnlCell=document.createElement('td');if(item.pnl_amount==null){pnlComplete=false;pnlCell.textContent='待补成本';pnlCell.className='mono'}else{const amount=document.createElement('span');amount.className='change';applyDirection(amount,item.pnl_amount);amount.textContent=`${item.pnl_amount>=0?'+':'−'}${money(Math.abs(item.pnl_amount))}`;const percent=document.createElement('small');percent.className=item.pnl_amount>=0?'positive':'negative';const pct=item.cost_nav?item.pnl_amount/(item.cost_nav*item.shares)*100:null;percent.textContent=pct==null?'':fmtPct(pct);pnlCell.append(amount,document.createElement('br'),percent)}tr.append(pnlCell);
       const changeCell=document.createElement('td');const changeLabel=document.createElement('span');changeLabel.className='change';applyDirection(changeLabel,change);changeLabel.textContent=fmtPct(change);changeCell.append(changeLabel);tr.append(changeCell);
       const navCell=document.createElement('td');navCell.className='mono';navCell.textContent=quote.nav==null?(quote.error?'获取失败':'—'):fmtValue(quote.nav);tr.append(navCell);
@@ -609,14 +649,72 @@
       if(change!=null&&item.market_value!=null){dailyPnl+=item.market_value*Number(change)/(100+Number(change));dailyKnown=true}
     });
     $('#emptyState').style.display='none';$('#holdingsSubtitle').textContent='持有金额与盈亏按最新估值计算';$('#fundCount').innerHTML=`${String(rows.length).padStart(2,'0')}<small>只</small>`;$('#holdingFoot').textContent=pnlComplete?'持仓成本信息完整':'补充成本净值可计算持有盈亏';
-    $('#totalValue').textContent=money(data.total_value);const totalPnl=$('#totalPnl');if(data.total_pnl==null){totalPnl.textContent='待补成本';totalPnl.classList.remove('positive','negative');$('#totalPnlPct').textContent='—';$('#totalPnlPct').classList.remove('positive','negative')}else{totalPnl.textContent=`${data.total_pnl>=0?'+':'−'}${money(Math.abs(data.total_pnl))}`;applyDirection(totalPnl,data.total_pnl);const pct=data.total_value&&data.total_value-data.total_pnl?data.total_pnl/(data.total_value-data.total_pnl)*100:null;$('#totalPnlPct').textContent=fmtPct(pct);applyDirection($('#totalPnlPct'),pct)}
+    setOdometer($('#totalValue'),money(data.total_value));const totalPnl=$('#totalPnl');if(data.total_pnl==null){totalPnl.textContent='待补成本';totalPnl.classList.remove('positive','negative');$('#totalPnlPct').textContent='—';$('#totalPnlPct').classList.remove('positive','negative')}else{totalPnl.textContent=`${data.total_pnl>=0?'+':'−'}${money(Math.abs(data.total_pnl))}`;applyDirection(totalPnl,data.total_pnl);const pct=data.total_value&&data.total_value-data.total_pnl?data.total_pnl/(data.total_value-data.total_pnl)*100:null;$('#totalPnlPct').textContent=fmtPct(pct);applyDirection($('#totalPnlPct'),pct)}
     const today=$('#todayPnl'),todayPct=dailyKnown&&data.total_value?dailyPnl/data.total_value*100:null;today.textContent=dailyKnown?`${dailyPnl>=0?'+':'−'}${money(Math.abs(dailyPnl))}`:'—';applyDirection(today,dailyPnl);$('#todayChange').textContent=fmtPct(todayPct);applyDirection($('#todayChange'),todayPct);
-    $('#refreshLabel').classList.remove('loading');$('#refreshLabel').querySelector('span').textContent=`${data.market?.label?data.market.label+'，':''}最新刷新 ${(data.refreshed_at||'').slice(11)||'刚刚'}`;$('#refreshLabel').querySelector('i').style.background='#72a983';$('#portfolioCaption').textContent='本地持仓 · 净值与盘中估算来自公开行情接口';$('#assetFoot').textContent='已按份额 × 最新估值计算';$('#assetAllocationTotal').textContent=data.total_value==null?'—':money(data.total_value);$('#allocationCaption').textContent='示例比例 · 未根据导入持仓重算';$('#allocationFoot').textContent='未根据导入持仓重算';$('#allFunds').disabled=true;$('#allFunds').textContent='风险等级待评估';$('#portfolioStatus').textContent='本地持仓已载入';$('#portfolioStatusDetail').textContent=`最近刷新 · ${data.refreshed_at||'刚刚'}\n${refreshMs?`估值每 ${refreshMs/1000} 秒自动更新`:'估值手动刷新'}` ;$('#portfolioStatusDetail').style.whiteSpace='pre-line';$('#disclaimerText').textContent='持仓列表、总资产和收益指标根据本机导入的基金份额及公开行情计算；资产配置图、走势曲线和近期动态仍为示例内容。盘中估值仅供参考，不代表正式成交价格；基金净值以基金公司公布为准。分析内容不构成投资建议。';
+    $('#refreshLabel').classList.remove('loading');$('#refreshLabel').querySelector('span').textContent=`${data.market?.label?data.market.label+'，':''}最新刷新 ${(data.refreshed_at||'').slice(11)||'刚刚'}`;$('#refreshLabel').querySelector('i').style.background='#72a983';$('#portfolioCaption').textContent='本地持仓 · 净值与盘中估算来自公开行情接口';$('#assetFoot').textContent='已按份额 × 最新估值计算';$('#assetAllocationTotal').textContent=data.total_value==null?'—':money(data.total_value);renderAllocation(rows,data.total_value);renderActivity(rows,data);$('.nav .count').textContent=String(rows.length);prevRowValues=Object.fromEntries(rows.map(r=>[r.fund_code,r.market_value]));$('#allFunds').disabled=true;$('#allFunds').textContent='风险等级待评估';$('#portfolioStatus').textContent='本地持仓已载入';$('#portfolioStatusDetail').textContent=`最近刷新 · ${data.refreshed_at||'刚刚'}\n${refreshMs?`估值每 ${refreshMs/1000} 秒自动更新`:'估值手动刷新'}` ;$('#portfolioStatusDetail').style.whiteSpace='pre-line';$('#disclaimerText').textContent='持仓列表、总资产和收益指标根据本机导入的基金份额及公开行情计算；资产配置图、走势曲线和近期动态仍为示例内容。盘中估值仅供参考，不代表正式成交价格；基金净值以基金公司公布为准。分析内容不构成投资建议。';
     $('#globalSearch').dispatchEvent(new Event('input'));
     tableMode='imported';
     applyTableView(true);
   }
   async function refreshPortfolio(){if(refreshInFlight)return;refreshInFlight=true;const label=$('#refreshLabel');label.classList.add('loading');label.querySelector('span').textContent='正在更新估值…';try{const response=await fetch('/api/portfolio',{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'刷新失败');if(data.holdings?.length){renderImportedPortfolio(data);loadIntraday()}else{label.classList.remove('loading');label.querySelector('span').textContent=lastImported?'已清空持仓':'示例数据';if(lastImported)renderEmptyPortfolio()}}catch(err){label.classList.remove('loading');label.querySelector('span').textContent='估值更新失败';label.title=err.message}finally{refreshInFlight=false}}
+  // ---------------- 点钞机数字：变化的位滚动，涨红跌绿闪一下 ----------------
+  const reduceMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  function setOdometer(el,text){
+    el.classList.remove('pending');el.setAttribute('aria-label',text);
+    const chars=[...text],dot=text.indexOf('.');const numeric=parseFloat(text.replace(/[^\d.-]/g,''));
+    const prev=parseFloat(el.dataset.value);const dir=Number.isFinite(prev)&&Number.isFinite(numeric)&&numeric!==prev?(numeric>prev?'chg-up':'chg-down'):'';
+    let cells=[...el.children];
+    const sameShape=cells.length===chars.length&&chars.every((c,i)=>/\d/.test(c)===cells[i].classList.contains('odo-cell'));
+    if(!sameShape){
+      el.replaceChildren();
+      cells=chars.map((c,i)=>{let node;
+        if(/\d/.test(c)){node=document.createElement('span');node.className='odo-cell';node.setAttribute('aria-hidden','true');node.dataset.d='0';
+          const strip=document.createElement('span');strip.className='odo-strip';strip.innerHTML='01234567890123456789'.split('').map(d=>`<span>${d}</span>`).join('');
+          if(!reduceMotion){strip.style.transitionDuration=`${1.3+i*0.07}s`;strip.style.transitionTimingFunction='cubic-bezier(.45,.05,.2,1)'}node.append(strip)}
+        else{node=document.createElement('span');node.className='odo-sym';node.setAttribute('aria-hidden','true');node.textContent=c}
+        if(dot>=0&&i>=dot)node.classList.add('odo-cents');el.append(node);return node});
+      void el.offsetWidth;
+    }
+    chars.forEach((c,i)=>{const cell=cells[i];
+      if(!cell.classList.contains('odo-cell')){cell.textContent=c;return}
+      const old=cell.dataset.d;cell.dataset.d=c;cell.firstChild.style.transform=`translateY(${-(10+Number(c))}em)`;
+      if(sameShape&&dir&&old!==c){cell.classList.remove('chg-up','chg-down');void cell.offsetWidth;cell.classList.add(dir);setTimeout(()=>cell.classList.remove(dir),900)}});
+    el.dataset.value=Number.isFinite(numeric)?String(numeric):'';
+  }
+
+  // ---------------- 入账印章 ----------------
+  function stampLedger(text){const el=$('#stamp');if(!el)return;$('#stampText').textContent=text;
+    const d=new Date();$('#stampDate').textContent=`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+    el.classList.remove('show');void el.getBoundingClientRect();el.classList.add('show')}
+
+  // ---------------- 资产配置与近期动态：按导入的持仓重算 ----------------
+  const CIRC=2*Math.PI*45;
+  function renderAllocation(rows,total){
+    const valued=rows.filter(r=>r.market_value>0).sort((a,b)=>b.market_value-a.market_value);if(!valued.length||!total)return;
+    const segments=valued.slice(0,4).map(r=>({name:r.fund_name,value:r.market_value}));
+    const rest=valued.slice(4).reduce((sum,r)=>sum+r.market_value,0);if(rest>0)segments.push({name:`其他 ${valued.length-4} 只`,value:rest});
+    const circles=$$('.donut circle:not(.track)'),rowsEl=$$('.alloc-row');let offset=0;const gap=segments.length>1?1.5:0;
+    circles.forEach((c,i)=>{const seg=segments[i];const len=seg?seg.value/total*CIRC:0;c.setAttribute('stroke-dasharray',`${Math.max(len-gap,0).toFixed(2)} ${CIRC.toFixed(2)}`);c.setAttribute('stroke-dashoffset',(-offset).toFixed(2));offset+=len});
+    rowsEl.forEach((row,i)=>{const seg=segments[i];row.hidden=!seg;if(!seg)return;row.querySelector('span').textContent=seg.name;row.querySelector('span').title=seg.name;row.querySelector('b').textContent=`${(seg.value/total*100).toFixed(1)}%`});
+    $('#allocationCaption').textContent='按当前市值计算的各基金占比';
+    $('#allocationFoot').textContent=`最大一只占 ${(valued[0].market_value/total*100).toFixed(1)}%`;
+  }
+  function renderActivity(rows,data){
+    const list=$('.activity-list');const moved=rows.filter(r=>r.quote?.change_pct!=null&&r.market_value!=null);const time=(data.refreshed_at||'').slice(11,16);
+    const impact=r=>r.market_value*Number(r.quote.change_pct)/(100+Number(r.quote.change_pct));
+    const item=(kind,title,body,note)=>{const div=document.createElement('div');div.className='activity';const ico=document.createElement('i');ico.className=`activity-ico ${kind}`;const main=document.createElement('div');main.className='activity-main';const strong=document.createElement('strong');strong.textContent=title;const small=document.createElement('small');small.textContent=note;main.append(strong,document.createTextNode(body),small);const t=document.createElement('time');t.textContent=time;div.append(ico,main,t);return div};
+    const items=[];
+    if(moved.length){const sorted=[...moved].sort((a,b)=>b.quote.change_pct-a.quote.change_pct);const best=sorted[0],worst=sorted[sorted.length-1];
+      const line=r=>`今日${r.quote.tag==='估算'?'估算':''}${fmtPct(r.quote.change_pct)}，影响 ${signedMoney(impact(r))}`;
+      items.push(item(best.quote.change_pct>=0?'up':'down',best.fund_name,line(best),`持仓市值 ${money(best.market_value)}`));
+      if(worst!==best)items.push(item(worst.quote.change_pct>=0?'up':'down',worst.fund_name,line(worst),`持仓市值 ${money(worst.market_value)}`))}
+    const est=rows.filter(r=>r.quote?.tag==='估算').length,official=rows.length-est;
+    items.push(item('note','估值口径',est?`${est} 只为盘中估算${official?`，${official} 只是正式净值`:''}`:'全部为正式净值',est?'盘中估值仅供参考，以基金公司公布的净值为准':'净值已公布，收益按正式净值计算'));
+    list.replaceChildren(...items);
+  }
+  const signedMoney=v=>`${v>=0?'+':'−'}${money(Math.abs(v))}`;
+  let prevRowValues={};
+
   // ---------------- 刷新节奏：可选间隔，页面在后台时暂停 ----------------
   const REFRESH_KEY='moneyAgent.refreshMs';let refreshMs=30000;
   try{const saved=parseInt(localStorage.getItem(REFRESH_KEY),10);if([0,15000,30000,60000].includes(saved))refreshMs=saved}catch{}
@@ -736,6 +834,7 @@
       closeHoldingModal();
       await refreshPortfolio();
       startPortfolioRefresh();
+      stampLedger(holdingMode==='create'?'已入账':'已记账');
       toast(payload.message||'持仓已更新');
     }catch(err){
       error.textContent=err.message;error.classList.add('visible');
@@ -761,7 +860,7 @@
     $('#fundRows').replaceChildren();
     $('#fundCount').innerHTML='00<small>只</small>';
     $('#holdingFoot').textContent='尚未添加持仓';
-    $('#totalValue').textContent='—';
+    setOdometer($('#totalValue'),'¥ —');$('.nav .count').textContent='0';
     $('#totalPnl').textContent='—';$('#totalPnl').classList.remove('positive','negative');
     $('#totalPnlPct').textContent='—';$('#totalPnlPct').classList.remove('positive','negative');
     $('#todayPnl').textContent='—';$('#todayChange').textContent='—';
@@ -770,7 +869,7 @@
     applyTableView(true);
   }
 
-  refreshPortfolio().then(()=>{if(lastPortfolio?.holdings?.length)startPortfolioRefresh();else applyTableView(true)});
+  refreshPortfolio().then(()=>{if(lastPortfolio?.holdings?.length)startPortfolioRefresh();else{applyTableView(true);if(!lastImported)setOdometer($('#totalValue'),'¥ 286,430.52')}});
 
   // ---------------- 存单花饰：几组正弦调制的极坐标曲线叠成扭索纹 ----------------
   function drawRosette(svg,bands,steps=420){
