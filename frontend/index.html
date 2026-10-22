@@ -233,7 +233,7 @@
     .modal-backdrop.open .modal{animation:rise .18s ease-out}
     @keyframes rise{from{opacity:0;transform:translateY(8px)}}
     .modal.has-result{width:min(760px,100%)}
-    .import-modal{width:min(780px,100%)}
+    .import-modal{width:min(940px,100%)}
     .modal-head{display:flex;align-items:center;justify-content:space-between}
     .modal-head h2{margin:0;font-size:18px;font-weight:600}
     .modal-close{width:32px;height:32px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:22px;line-height:1}
@@ -276,11 +276,23 @@
     .upload-drop small{display:block;margin-top:3px;font-size:12px;color:var(--muted)}
     .import-status{min-height:20px;font-size:13px;color:var(--ink-2)}
     .review-scroll{max-height:42vh;overflow:auto;border:1px solid var(--rule);border-radius:10px}
-    .review-table{min-width:620px}
+    .review-table{min-width:820px}
     .review-table th,.review-table td{padding:8px 10px;text-align:left}
     .review-table th:first-child,.review-table td:first-child{padding-left:12px}
     .review-input{width:100%;height:32px;padding:0 8px;border:1px solid var(--rule);border-radius:6px;background:var(--card);outline:0;font-size:13px}
     .review-input:focus{border-color:var(--accent)}
+    .review-source{min-width:200px;white-space:normal}
+    .review-source strong{display:block;font-size:13px;font-weight:600;color:var(--ink)}
+    .review-source small{display:block;margin-top:2px;font-size:12px;color:var(--muted)}
+    .match-badge{display:inline-block;margin-top:5px;padding:1px 7px;border-radius:4px;font-size:11px;background:var(--down-soft);color:var(--down)}
+    .match-badge.check{background:var(--brass-soft);color:var(--brass)}
+    .match-badge.none{background:var(--up-soft);color:var(--up)}
+    .review-select{display:block;width:100%;height:32px;margin-bottom:6px;padding:0 6px;border:1px solid var(--rule);border-radius:6px;background:var(--card);font-size:13px}
+    .review-table td:nth-child(2){min-width:250px}
+    .review-table td:nth-child(3),.review-table td:nth-child(4){min-width:120px}
+    .review-hint{display:block;margin-top:4px;font-size:11px;color:var(--muted);white-space:normal}
+    .review-hint.warn{color:var(--brass)}
+    .review-table td{vertical-align:top}
     .review-remove{width:28px;height:28px;border:0;border-radius:6px;background:transparent;color:var(--up);font-size:18px}
     .review-remove:hover{background:var(--up-soft)}
     .review-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
@@ -458,7 +470,7 @@
   </main>
 </div>
 <div class="toast" id="toast" role="status"></div>
-<div class="modal-backdrop" id="importModal"><section class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="importTitle"><div class="modal-head"><h2 id="importTitle">从支付宝截图导入持仓</h2><button class="modal-close" id="closeImport" aria-label="关闭">×</button></div><p>选一张基金持仓截图，本机会识别出基金代码、名称、份额和成本。导入前请核对一遍。</p><div class="upload-drop"><div><strong id="fileLabel">支持 PNG、JPG、WebP，最大 12 MB</strong><small>截图只在本机处理，不会上传到外部服务。</small></div><button class="outline-btn" id="chooseImage">选择截图</button></div><div class="import-status" id="importStatus" role="status"></div><div class="review-scroll"><table class="review-table"><thead><tr><th>基金名称</th><th>基金代码</th><th>持有份额</th><th>成本净值（选填）</th><th></th></tr></thead><tbody id="candidateRows"></tbody></table><div class="empty" id="candidateEmpty">上传截图后，识别结果会显示在这里。也可以手动添加基金。</div></div><div class="review-tools"><button class="filter-btn" id="addCandidate">＋ 手动添加一只</button><span class="refresh-label">导入后立即估值，之后每分钟刷新</span></div><div class="local-note">成本净值用来计算持有盈亏。确认导入会替换当前持仓，同一代码的基金会自动合并。</div><div class="modal-actions"><button class="outline-btn" id="cancelImport">取消</button><button class="primary-btn" id="saveHoldings">确认导入</button></div></section></div>
+<div class="modal-backdrop" id="importModal"><section class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="importTitle"><div class="modal-head"><h2 id="importTitle">从支付宝截图导入持仓</h2><button class="modal-close" id="closeImport" aria-label="关闭">×</button></div><p>上传支付宝「我的持有」列表截图。本机识别每只基金的名称、金额和收益，自动匹配基金代码，并按最近正式净值推算份额和成本。导入前请核对一遍。</p><div class="upload-drop"><div><strong id="fileLabel">支持 PNG、JPG、WebP，最大 12 MB</strong><small>截图只在本机处理，不会上传到外部服务。</small></div><button class="outline-btn" id="chooseImage">选择截图</button></div><div class="import-status" id="importStatus" role="status"></div><div class="review-scroll"><table class="review-table"><thead><tr><th>截图识别</th><th>匹配基金</th><th>持有份额</th><th>成本净值</th><th></th></tr></thead><tbody id="candidateRows"></tbody></table><div class="empty" id="candidateEmpty">上传截图后，识别结果会显示在这里。也可以手动添加基金。</div></div><div class="review-tools"><button class="filter-btn" id="addCandidate">＋ 手动添加一只</button><span class="refresh-label">导入后立即估值，之后每分钟刷新</span></div><div class="local-note">成本净值用来计算持有盈亏。确认导入会替换当前持仓，同一代码的基金会自动合并。</div><div class="modal-actions"><button class="outline-btn" id="cancelImport">取消</button><button class="primary-btn" id="saveHoldings">确认导入</button></div></section></div>
 <div class="modal-backdrop" id="holdingModal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="holdingTitle"><div class="modal-head"><h2 id="holdingTitle">新增持仓</h2><button class="modal-close" id="closeHolding" aria-label="关闭">×</button></div><p id="holdingHint"></p><div class="holding-summary" id="holdingSummary" hidden></div><div id="holdingFields"></div><div class="analysis-error" id="holdingError" role="alert"></div><div class="modal-actions"><button class="outline-btn" id="cancelHolding">取消</button><button class="primary-btn" id="submitHolding">保存持仓</button></div></section></div>
 <div class="modal-backdrop" id="modal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">智能基金分析</h2><button class="modal-close" id="closeModal" aria-label="关闭">×</button></div><p>输入基金名称或代码，也可以写上持有份额和成本净值。分析由本地 Money Agent 生成，缺失的行情会在结果里标出。</p><textarea id="queryInput" placeholder="例如：分析 110020，我持有 1000 份，成本净值 1.52"></textarea><div class="modal-actions"><button class="outline-btn" id="cancelModal">关闭</button><button class="primary-btn" id="submitQuery">生成分析</button></div><div class="analysis-error" id="analysisError" role="alert"></div><div class="analysis-output" id="analysisOutput" aria-live="polite"></div></section></div>
 <script>
@@ -524,13 +536,62 @@
   $('#activityMore').addEventListener('click',()=>openAnalysis('请分析一只基金，并总结近期风险和行业动态'));
 
   const importModal=$('#importModal'), candidateRows=$('#candidateRows'), importStatus=$('#importStatus');
-  function appendCandidate(item={}){const tr=document.createElement('tr');const fields=[['fund_name','基金名称',item.fund_name||'','text'],['fund_code','6 位代码',item.fund_code||'','text'],['shares','份额',item.shares??'','number'],['cost_nav','成本净值',item.cost_nav??'','number']];for(const [key,placeholder,value,type] of fields){const td=document.createElement('td');const input=document.createElement('input');input.className='review-input';input.dataset.field=key;input.type=type;input.placeholder=placeholder;input.value=value;if(type==='number'){input.min='0';input.step='any'}td.append(input);tr.append(td)}const action=document.createElement('td');const remove=document.createElement('button');remove.className='review-remove';remove.type='button';remove.textContent='×';remove.setAttribute('aria-label','移除基金');remove.addEventListener('click',()=>{tr.remove();$('#candidateEmpty').style.display=candidateRows.children.length?'none':'block'});action.append(remove);tr.append(action);candidateRows.append(tr);$('#candidateEmpty').style.display='none'}
+  const yuan=v=>v==null?'—':Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const signed=v=>v==null?'—':`${v>=0?'+':'−'}${yuan(Math.abs(v))}`;
+  function makeInput(field,placeholder,value,type='text'){const input=document.createElement('input');input.className='review-input';input.dataset.field=field;input.type=type;input.placeholder=placeholder;input.value=value??'';if(type==='number'){input.min='0';input.step='any'}return input}
+  // 按「金额 ÷ 正式净值」推算份额，「(金额 − 持有收益) ÷ 份额」推算成本净值
+  function derive(tr,nav,navDate){const hint=tr.querySelector('.review-hint');const amount=parseFloat(tr.dataset.amount),pnl=parseFloat(tr.dataset.pnl),rate=parseFloat(tr.dataset.rate);
+    if(!(amount>0)){hint.textContent='';return}
+    if(!(nav>0)){hint.textContent='没拿到净值，请手动填写份额';hint.classList.add('warn');return}
+    const shares=amount/nav;let costValue=Number.isFinite(pnl)?amount-pnl:Number.isFinite(rate)?amount/(1+rate/100):null;
+    tr.querySelector('[data-field="shares"]').value=shares.toFixed(2);
+    tr.querySelector('[data-field="cost_nav"]').value=costValue>0?(costValue/shares).toFixed(4):'';
+    hint.classList.remove('warn');hint.textContent=`按${navDate?` ${navDate} `:''}净值 ${Number(nav).toFixed(4)} 推算`}
+  async function lookupFund(tr,code){const hint=tr.querySelector('.review-hint');if(!/^\d{6}$/.test(code)){hint.textContent=code?'基金代码应为 6 位数字':'';return}
+    hint.classList.remove('warn');hint.textContent='正在查询净值…';
+    try{const response=await fetch(`/api/fund/${code}`);const data=await response.json();if(!response.ok)throw new Error(data.error||'查询失败');
+      if(data.fund_name)tr.querySelector('[data-field="fund_name"]').value=data.fund_name;
+      if(tr.dataset.amount)derive(tr,data.nav,data.nav_date);else hint.textContent=data.fund_name||''}
+    catch(err){hint.classList.add('warn');hint.textContent=err.message}}
+  function appendCandidate(item={}){const tr=document.createElement('tr');const fromScreen=Boolean(item.ocr_name&&item.amount!=null);
+    if(item.amount!=null)tr.dataset.amount=item.amount;if(item.holding_pnl!=null)tr.dataset.pnl=item.holding_pnl;if(item.holding_rate!=null)tr.dataset.rate=item.holding_rate;
+    // 1. 截图识别
+    const source=document.createElement('td');source.className='review-source';const nameInput=makeInput('fund_name','基金名称',item.fund_name||'');
+    if(fromScreen){const title=document.createElement('strong');title.textContent=item.ocr_name;const meta=document.createElement('small');meta.textContent=`金额 ${yuan(item.amount)}　持有收益 ${signed(item.holding_pnl)}`;
+      const badge=document.createElement('span');badge.className=`match-badge ${item.confidence||'none'}`;badge.textContent={high:'已匹配',check:'请核对',none:'未匹配'}[item.confidence]||'未匹配';
+      nameInput.type='hidden';source.append(title,meta,badge,nameInput)}
+    else source.append(nameInput);
+    tr.append(source);
+    // 2. 匹配基金
+    const match=document.createElement('td');const codeInput=makeInput('fund_code','6 位代码',item.fund_code||'');codeInput.inputMode='numeric';codeInput.maxLength=6;
+    if(item.matches?.length){const select=document.createElement('select');select.className='review-select';select.setAttribute('aria-label','选择匹配的基金');
+      item.matches.forEach(m=>{const o=document.createElement('option');o.value=m.fund_code;o.textContent=`${m.fund_name}　${m.fund_code}`;select.append(o)});
+      const other=document.createElement('option');other.value='';other.textContent='都不是，手动填写代码';select.append(other);select.value=item.fund_code||'';
+      select.addEventListener('change',()=>{codeInput.value=select.value;if(select.value){nameInput.value=item.matches.find(m=>m.fund_code===select.value)?.fund_name||'';lookupFund(tr,select.value)}else{codeInput.focus()}});
+      codeInput.addEventListener('input',()=>{if(![...select.options].some(o=>o.value===codeInput.value))select.value=''});
+      match.append(select)}
+    codeInput.addEventListener('change',()=>lookupFund(tr,codeInput.value.trim()));match.append(codeInput);tr.append(match);
+    // 3. 份额与成本
+    const sharesCell=document.createElement('td');sharesCell.append(makeInput('shares','份额',item.shares??'','number'));const hint=document.createElement('small');hint.className='review-hint';sharesCell.append(hint);tr.append(sharesCell);
+    const costCell=document.createElement('td');costCell.append(makeInput('cost_nav','成本净值',item.cost_nav??'','number'));tr.append(costCell);
+    if(fromScreen){if(item.nav)derive(tr,item.nav,item.nav_date);else if(item.fund_code){hint.classList.add('warn');hint.textContent='没拿到净值，请手动填写份额'}else{hint.classList.add('warn');hint.textContent='请先选择或填写基金代码'}}
+    const action=document.createElement('td');const remove=document.createElement('button');remove.className='review-remove';remove.type='button';remove.textContent='×';remove.setAttribute('aria-label','移除基金');remove.addEventListener('click',()=>{tr.remove();$('#candidateEmpty').style.display=candidateRows.children.length?'none':'block'});action.append(remove);tr.append(action);
+    candidateRows.append(tr);$('#candidateEmpty').style.display='none'}
   $('#importBtn').addEventListener('click',()=>{candidateRows.replaceChildren();$('#candidateEmpty').style.display='block';importStatus.textContent='';$('#fileLabel').textContent='支持 PNG、JPG、WebP，最大 12 MB';$('#ocrRaw')?.remove();importModal.classList.add('open')});
   $('#chooseImage').addEventListener('click',()=>$('#importFile').click());
   $('#closeImport').addEventListener('click',()=>importModal.classList.remove('open'));$('#cancelImport').addEventListener('click',()=>importModal.classList.remove('open'));
   importModal.addEventListener('click',e=>{if(e.target===importModal)importModal.classList.remove('open')});
   $('#addCandidate').addEventListener('click',()=>appendCandidate());
-  $('#importFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;$('#fileLabel').textContent=file.name;if(file.size>12*1024*1024){importStatus.textContent='图片超过 12 MB，请压缩或裁剪后重试';return}importStatus.textContent='正在本机识别截图…';const form=new FormData();form.append('screenshot',file);try{const response=await fetch('/api/import-screenshot',{method:'POST',body:form});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'识别失败');candidateRows.replaceChildren();(payload.candidates||[]).forEach(appendCandidate);if(!payload.candidates?.length)appendCandidate();$('#candidateEmpty').style.display='none';importStatus.textContent=payload.candidates?.length?`识别到 ${payload.candidates.length} 个基金代码，请核对名称、份额和成本。`:'未识别到基金代码，可手动添加并填写 6 位基金代码。';let detail=$('#ocrRaw');if(!detail){detail=document.createElement('details');detail.id='ocrRaw';detail.className='result-report';const summary=document.createElement('summary');summary.textContent='查看 OCR 识别原文';const pre=document.createElement('pre');pre.textContent=payload.text||'没有识别到文字';detail.append(summary,pre);$('.import-modal .local-note').before(detail)}else detail.querySelector('pre').textContent=payload.text||'没有识别到文字'}catch(err){importStatus.textContent=`${err.message}。确认服务已启动后，可手动添加持仓。`;candidateRows.replaceChildren();appendCandidate()}finally{e.target.value=''}});
+  $('#importFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;$('#fileLabel').textContent=file.name;if(file.size>12*1024*1024){importStatus.textContent='图片超过 12 MB，请压缩或裁剪后重试';return}importStatus.textContent='正在本机识别截图并匹配基金…';const form=new FormData();form.append('screenshot',file);
+    try{const response=await fetch('/api/import-screenshot',{method:'POST',body:form});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'识别失败');
+      const rows=payload.candidates||[];candidateRows.replaceChildren();rows.forEach(appendCandidate);if(!rows.length)appendCandidate();$('#candidateEmpty').style.display='none';
+      if(payload.source==='holdings'){const check=rows.filter(r=>r.confidence!=='high').length;const noNav=rows.filter(r=>r.fund_code&&!r.nav).length;
+        const parts=[`识别到 ${rows.length} 只基金。`];if(!payload.fund_list_available)parts.push('基金名称表暂时取不到，请为每只基金填写 6 位代码。');else if(check)parts.push(`其中 ${check} 只请核对匹配的基金。`);else parts.push('基金都已匹配。');
+        if(noNav)parts.push(`${noNav} 只没拿到净值，需要手动填写份额。`);else if(payload.fund_list_available)parts.push('份额和成本按最近正式净值推算，确认无误后导入。');importStatus.textContent=parts.join('')}
+      else if(rows.length)importStatus.textContent=`识别到 ${rows.length} 个基金代码，请核对名称、份额和成本。`;
+      else importStatus.textContent='没有识别出基金。请上传持仓列表页的截图，或手动添加。';
+      let detail=$('#ocrRaw');if(!detail){detail=document.createElement('details');detail.id='ocrRaw';detail.className='result-report';const summary=document.createElement('summary');summary.textContent='查看 OCR 识别原文';const pre=document.createElement('pre');detail.append(summary,pre);$('.import-modal .local-note').before(detail)}detail.querySelector('pre').textContent=payload.text||'没有识别到文字'}
+    catch(err){importStatus.textContent=`${err.message}。确认服务已启动后，可手动添加持仓。`;candidateRows.replaceChildren();appendCandidate()}finally{e.target.value=''}});
   $('#saveHoldings').addEventListener('click',async()=>{const holdings=[...candidateRows.rows].map(row=>Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value.trim()])));if(!holdings.length){importStatus.textContent='请先添加至少一只基金';return}if(holdings.some(item=>!/^\d{6}$/.test(item.fund_code)||!item.shares||Number(item.shares)<=0)){importStatus.textContent='请检查基金代码（6 位数字）和大于 0 的持有份额';return}const button=$('#saveHoldings');button.disabled=true;button.textContent='正在保存…';try{const response=await fetch('/api/holdings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({holdings})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'保存失败');importModal.classList.remove('open');$('#portfolioCaption').textContent='支付宝截图导入的持仓 · 估值按分钟自动刷新';$('#portfolioSelect').options[0].text='我的持仓';$('#exportBtn').lastElementChild.textContent='导出持仓';await refreshPortfolio();startPortfolioRefresh();toast(`已导入 ${payload.count} 只基金，开始获取最新估值`)}catch(err){importStatus.textContent=err.message}finally{button.disabled=false;button.textContent='确认导入'}});
 
   let refreshTimer=null,lastPortfolio=null,refreshInFlight=false,lastImported=false;

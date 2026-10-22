@@ -16,6 +16,14 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from money_agent.importer import (
+    FundIndex,
+    codes_in_text,
+    derive_position,
+    observations_from_payload,
+    parse_holdings,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
 DATA_FILE = ROOT / ".money-agent-data" / "holdings.json"
@@ -24,6 +32,9 @@ MAX_BODY_BYTES = 12 * 1024 * 1024
 QUOTE_CACHE_SECONDS = 45
 _quote_cache: dict[str, tuple[float, dict]] = {}
 _cache_lock = threading.Lock()
+FUND_INDEX_SECONDS = 6 * 3600
+_fund_index: tuple[float, FundIndex] | None = None
+_fund_index_lock = threading.Lock()
 
 
 def _holdings() -> list[dict]:
@@ -142,7 +153,108 @@ def _ocr_image(image: bytes, suffix: str) -> str:
     if result.returncode:
         message = (result.stderr or result.stdout).strip()[-500:]
         raise RuntimeError(f"截图识别失败：{message or 'Vision OCR 错误'}")
-    return result.stdout.strip()
+    output = result.stdout.strip()
+    try:
+        payload: object = json.loads(output)
+    except json.JSONDecodeError:
+        payload = output  # 旧版 OCR 脚本只输出文字
+    return observations_from_payload(payload)
+
+
+def _load_fund_index() -> FundIndex | None:
+    """基金名称表（akshare，磁盘缓存 12 小时）做成内存索引；拿不到时返回 None。"""
+    global _fund_index
+    with _fund_index_lock:
+        if _fund_index and time.monotonic() - _fund_index[0] < FUND_INDEX_SECONDS:
+            return _fund_index[1]
+        try:
+            from money_agent.config import Settings
+            from money_agent.data.resolver import fund_table
+
+            df = fund_table(Settings())
+        except Exception:  # noqa: BLE001 - 依赖缺失或网络失败时退化为手动填写代码
+            return None
+        if df is None or df.empty:
+            return None
+        kinds = df["基金类型"].astype(str) if "基金类型" in df.columns else [""] * len(df)
+        records = list(zip(df["基金代码"].astype(str), df["基金简称"].astype(str), kinds))
+        index = FundIndex(records)
+        _fund_index = (time.monotonic(), index)
+        return index
+
+
+def _confirmed_nav(code: str) -> tuple[float | None, str | None]:
+    """最近一个已公布的正式净值。支付宝的持有金额按它计算，不用盘中估值。"""
+    try:
+        from money_agent.agent.functions import get_fund_latest_info
+
+        info = get_fund_latest_info(code)
+    except Exception:  # noqa: BLE001
+        return None, None
+    if info.get("error"):
+        return None, None
+    if info.get("tag") == "估算":
+        nav, date = info.get("official_nav"), info.get("official_nav_date")
+    elif info.get("is_exchange_traded"):
+        nav, date = info.get("unit_nav") or info.get("nav"), info.get("unit_nav_date") or info.get("nav_time")
+    else:
+        nav, date = info.get("nav"), info.get("nav_time")
+    try:
+        return (float(nav), str(date) if date else None) if nav is not None else (None, None)
+    except (TypeError, ValueError):
+        return None, None
+
+
+def _recognize_holdings(observations: list) -> dict:
+    """截图 → 待确认的持仓列表：名称匹配代码，再按正式净值推算份额和成本。"""
+    text = "\n".join(o.text for o in observations)
+    parsed = parse_holdings(observations)
+    index = _load_fund_index()
+    rows: list[dict] = []
+    if parsed:
+        source = "holdings"
+        for item in parsed:
+            matches = index.match(item.ocr_name) if index else []
+            best = matches[0] if matches else None
+            confidence = "none"
+            if best:
+                close = len(matches) > 1 and matches[1]["score"] >= best["score"] - 0.02
+                confidence = "high" if best["score"] >= 0.97 and not close else "check"
+            rows.append({
+                **item.to_dict(),
+                "matches": matches,
+                "fund_code": best["fund_code"] if best else "",
+                "fund_name": best["fund_name"] if best else item.ocr_name,
+                "confidence": confidence,
+            })
+    else:
+        source = "codes" if codes_in_text(text) else "none"
+        for cand in _extract_candidates(text):
+            hit = index.lookup_code(cand["fund_code"]) if index else None
+            rows.append({
+                **cand,
+                "ocr_name": cand.get("fund_name") or cand["fund_code"],
+                "fund_name": cand.get("fund_name") or (hit["fund_name"] if hit else ""),
+                "matches": [hit] if hit else [],
+                "confidence": "high" if hit else "check",
+            })
+
+    def fill(row: dict) -> None:
+        if not row.get("fund_code") or row.get("amount") is None:
+            return
+        nav, nav_date = _confirmed_nav(row["fund_code"])
+        row["nav"], row["nav_date"] = nav, nav_date
+        row.update(derive_position(row.get("amount"), row.get("holding_pnl"), nav, row.get("holding_rate")))
+
+    if source == "holdings" and rows:
+        with ThreadPoolExecutor(max_workers=min(6, len(rows))) as pool:
+            list(pool.map(fill, rows))
+    return {
+        "text": text,
+        "source": source,
+        "candidates": rows,
+        "fund_list_available": index is not None,
+    }
 
 
 def _quote_for(holding: dict) -> dict:
@@ -211,6 +323,9 @@ class MoneyAgentHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
+        if path.startswith("/api/fund/"):
+            self._fund_info(unquote(path[len("/api/fund/"):]).strip("/"))
+            return
         if path == "/api/portfolio":
             try:
                 self._send_json(200, _portfolio_payload())
@@ -247,6 +362,27 @@ class MoneyAgentHandler(SimpleHTTPRequestHandler):
         else:
             self.send_error(404, "Not found")
 
+    def _fund_info(self, code: str) -> None:
+        """单只基金的名称与最近正式净值，导入确认时改了代码用来重算份额和成本。"""
+        try:
+            code = _validate_code(code)
+        except ValueError as exc:
+            self._send_json(422, {"error": str(exc)})
+            return
+        index = _load_fund_index()
+        hit = index.lookup_code(code) if index else None
+        nav, nav_date = _confirmed_nav(code)
+        if hit is None and nav is None:
+            self._send_json(404, {"error": f"没有找到代码为 {code} 的基金，或行情暂时不可用"})
+            return
+        self._send_json(200, {
+            "fund_code": code,
+            "fund_name": hit["fund_name"] if hit else "",
+            "fund_type": hit["fund_type"] if hit else "",
+            "nav": nav,
+            "nav_date": nav_date,
+        })
+
     def _read_body(self) -> bytes:
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0 or length > MAX_BODY_BYTES:
@@ -274,8 +410,7 @@ class MoneyAgentHandler(SimpleHTTPRequestHandler):
             suffix = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}.get(image_type)
             if not image or not suffix:
                 raise ValueError("支持 PNG、JPG 或 WebP 图片")
-            text = _ocr_image(image, suffix)
-            self._send_json(200, {"text": text, "candidates": _extract_candidates(text)})
+            self._send_json(200, _recognize_holdings(_ocr_image(image, suffix)))
         except (ValueError, RuntimeError) as exc:
             self._send_json(422, {"error": str(exc)})
 

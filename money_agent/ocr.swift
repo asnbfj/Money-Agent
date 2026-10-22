@@ -20,11 +20,22 @@ do {
         }
         return $0.boundingBox.minX < $1.boundingBox.minX
     }
+    // 输出带坐标的 JSON（原点改为左上角），便于按行、按列还原持仓卡片
+    var items: [[String: Any]] = []
     for observation in observations {
-        if let text = observation.topCandidates(1).first?.string {
-            print(text)
-        }
+        guard let candidate = observation.topCandidates(1).first else { continue }
+        let box = observation.boundingBox
+        items.append([
+            "text": candidate.string,
+            "x": Double(box.minX),
+            "y": Double(1 - box.maxY),
+            "w": Double(box.width),
+            "h": Double(box.height),
+            "confidence": Double(candidate.confidence),
+        ])
     }
+    let data = try JSONSerialization.data(withJSONObject: ["observations": items], options: [])
+    FileHandle.standardOutput.write(data)
 } catch {
     FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
     exit(1)
