@@ -18,6 +18,7 @@ import pandas as pd
 import requests
 
 from money_agent.config import Settings
+from money_agent.data.market import fetch_tencent_fund, is_today, is_trading_day
 from money_agent.data.resolver import is_exchange_traded_fund
 from money_agent.data.retry import safe_call
 from money_agent.models import History, Quote, Target
@@ -35,11 +36,14 @@ _MOBILE_HEADERS = {
 
 
 def is_a_share_trading_time(now: datetime | None = None) -> bool:
-    """粗略判断是否处于 A 股交易时段（未考虑法定节假日）。"""
+    """是否处于 A 股交易时段。不传 now 时按当前时间，并用上证指数判断节假日。"""
+    live = now is None
     now = now or datetime.now()
     if now.weekday() >= 5:
         return False
-    return time(9, 25) <= now.time() <= time(15, 5)
+    if not time(9, 25) <= now.time() <= time(15, 5):
+        return False
+    return is_trading_day(now) if live else True
 
 
 def _float(value) -> float | None:
@@ -67,6 +71,36 @@ def _mobile_fund_snapshot(code: str, timeout: int) -> dict:
     return resp.json()
 
 
+def _maybe_newer_nav(quote: Quote, now: datetime | None = None) -> bool:
+    """交易日收盘后、手里的正式净值还不是今天的：可能别的源已经更新了。"""
+    now = now or datetime.now()
+    return (
+        now.time() >= time(15, 0)
+        and not is_today(quote.official_nav_date, now.date())
+        and is_trading_day(now)
+    )
+
+
+def _apply_tencent_nav(quote: Quote, code: str, settings: Settings) -> None:
+    """用腾讯的正式净值补位：东方财富没数据，或腾讯的净值日期更新。"""
+    tencent, _err = safe_call(
+        lambda: fetch_tencent_fund(code, settings.http_timeout),
+        label=f"获取 {code} 腾讯基金净值",
+        attempts=max(1, settings.retry_attempts - 1),
+        delay=settings.retry_delay,
+    )
+    if not tencent:
+        return
+    newer = (tencent.get("nav_date") or "") > (quote.official_nav_date or "")
+    if quote.official_nav is None or newer:
+        quote.official_nav = tencent["nav"]
+        quote.official_nav_date = tencent.get("nav_date")
+        quote.change_pct = tencent.get("change_pct")
+        quote.source = (quote.source + " + " if quote.source else "") + "腾讯财经基金净值"
+        if not quote.name and tencent.get("name"):
+            quote.name = tencent["name"]
+
+
 def _fund_quote(target: Target, settings: Settings, history: History | None) -> Quote:
     exchange = is_exchange_traded_fund(target)
     quote = Quote(name=target.name, code=target.code)
@@ -89,6 +123,10 @@ def _fund_quote(target: Target, settings: Settings, history: History | None) -> 
         quote.market_time = d.get("HQDATE")
         quote.source = "东方财富基金估值接口(fundmobapi)"
 
+    # 备用源：东方财富没数据，或收盘后东方财富还没更新当日净值时，问一次腾讯
+    if not exchange and (not datas or _maybe_newer_nav(quote)):
+        _apply_tencent_nav(quote, target.code, settings)
+
     if exchange:
         # 场内 ETF/LOF：当前价值用市价，其次是日线收盘；不算“盘中估算”
         if quote.market_price is None and history and history.points:
@@ -104,9 +142,12 @@ def _fund_quote(target: Target, settings: Settings, history: History | None) -> 
         return quote
 
     # 场外基金：盘中估算（仅参考）与官方正式净值分开
-    if datas:
+    if datas or quote.official_nav is not None:
+        # 当天有估值、当天净值还没公布 → 用估值（覆盖收盘后到净值公布前这段时间）
         quote.is_intraday_estimate = (
-            quote.estimate_value is not None and is_a_share_trading_time()
+            quote.estimate_value is not None
+            and is_today(quote.estimate_time)
+            and not is_today(quote.official_nav_date)
         )
         if quote.is_intraday_estimate:
             quote.value = quote.estimate_value
@@ -114,7 +155,8 @@ def _fund_quote(target: Target, settings: Settings, history: History | None) -> 
             quote.data_time = quote.estimate_time
         else:
             quote.value = quote.official_nav
-            quote.change_pct = _float(datas[0].get("NAVCHGRT"))
+            if quote.change_pct is None and datas:
+                quote.change_pct = _float(datas[0].get("NAVCHGRT"))
             quote.data_time = quote.official_nav_date
         return quote
 
