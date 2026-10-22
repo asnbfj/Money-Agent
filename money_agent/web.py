@@ -29,7 +29,9 @@ FRONTEND = ROOT / "frontend"
 DATA_FILE = ROOT / ".money-agent-data" / "holdings.json"
 OCR_SCRIPT = Path(__file__).with_name("ocr.swift")
 MAX_BODY_BYTES = 12 * 1024 * 1024
-QUOTE_CACHE_SECONDS = 45
+QUOTE_CACHE_SECONDS = float(os.getenv("MONEY_AGENT_QUOTE_CACHE", "20"))
+INTRADAY_CACHE_SECONDS = 50
+_intraday_cache: dict[str, tuple[float, dict | None]] = {}
 _quote_cache: dict[str, tuple[float, dict]] = {}
 _cache_lock = threading.Lock()
 FUND_INDEX_SECONDS = 6 * 3600
@@ -306,13 +308,69 @@ def _portfolio_payload() -> dict:
         "total_value": round(total_value, 2) if rows and any(r["market_value"] is not None for r in rows) else None,
         "total_pnl": round(total_pnl, 2) if pnl_complete and holdings else None,
         "refreshed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "market": _market_status(),
+        "quote_cache_seconds": QUOTE_CACHE_SECONDS,
     }
+
+
+def _market_status() -> dict:
+    try:
+        from money_agent.data.market import market_status
+
+        return market_status()
+    except Exception:  # noqa: BLE001 - 依赖缺失时前端按普通刷新处理
+        return {"trading_day": None, "phase": "unknown", "label": ""}
+
+
+def _intraday_for(code: str) -> dict | None:
+    """单只基金的当日分时估值（腾讯 getSsgz），缓存 50 秒。"""
+    now = time.monotonic()
+    with _cache_lock:
+        cached = _intraday_cache.get(code)
+        if cached and now - cached[0] < INTRADAY_CACHE_SECONDS:
+            return cached[1]
+    try:
+        from money_agent.data.market import fetch_intraday
+
+        data = fetch_intraday(code)
+    except Exception:  # noqa: BLE001 - 单只失败不影响组合
+        data = None
+    with _cache_lock:
+        _intraday_cache[code] = (now, data)
+    return data
+
+
+def _portfolio_intraday_payload() -> dict:
+    """组合当日分时：按份额加总各基金的分时估值。"""
+    from money_agent.data.market import portfolio_intraday
+
+    holdings = _holdings()
+    if not holdings:
+        return {"available": False, "reason": "还没有持仓", "market": _market_status()}
+    with ThreadPoolExecutor(max_workers=min(5, len(holdings))) as pool:
+        datas = list(pool.map(lambda h: _intraday_for(h["fund_code"]), holdings))
+    series = []
+    funds = []
+    for holding, data in zip(holdings, datas):
+        shares = float(holding.get("shares") or 0)
+        base = data.get("yesterday_nav") if data else None
+        if base is None:
+            # 没有分时的基金按最近正式净值计入组合，不影响涨跌
+            quote = _quote_for(holding)
+            base = quote.get("official_nav") or quote.get("nav")
+        series.append({"shares": shares, "yesterday_nav": base, "points": (data or {}).get("points", [])})
+        funds.append({"fund_code": holding["fund_code"], "has_intraday": bool(data and data.get("points"))})
+    result = portfolio_intraday(series)
+    if not result:
+        return {"available": False, "reason": "暂时没有当日分时估值", "funds": funds, "market": _market_status()}
+    return {"available": True, **result, "funds": funds, "market": _market_status()}
 
 
 def _clear_quote_cache() -> None:
     """持仓变动后必须清缓存，否则新份额/新成本会配上旧估值。"""
     with _cache_lock:
         _quote_cache.clear()
+        _intraday_cache.clear()
 
 
 class MoneyAgentHandler(SimpleHTTPRequestHandler):
@@ -323,6 +381,23 @@ class MoneyAgentHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
+        if path == "/api/intraday":
+            try:
+                self._send_json(200, _portfolio_intraday_payload())
+            except Exception as exc:  # noqa: BLE001
+                self.log_error("intraday failed: %s", exc)
+                self._send_json(500, {"error": "分时估值暂时不可用"})
+            return
+        if path.startswith("/api/intraday/"):
+            code = unquote(path[len("/api/intraday/"):]).strip("/")
+            try:
+                code = _validate_code(code)
+            except ValueError as exc:
+                self._send_json(422, {"error": str(exc)})
+                return
+            data = _intraday_for(code)
+            self._send_json(200 if data else 404, data or {"error": "暂时没有该基金的分时估值"})
+            return
         if path.startswith("/api/fund/"):
             self._fund_info(unquote(path[len("/api/fund/"):]).strip("/"))
             return
