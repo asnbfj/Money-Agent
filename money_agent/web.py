@@ -16,6 +16,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from money_agent.data.estimate import estimate_for
 from money_agent.importer import (
     FundIndex,
     codes_in_text,
@@ -280,15 +281,57 @@ def _quote_for(holding: dict) -> dict:
     return quote
 
 
+def _estimate_quote(quote: dict, trading_day: bool) -> dict | None:
+    """给一只基金的报价附上自建盘中估算。
+
+    只在「交易日 + 今日正式净值尚未公布」时生效（判定逻辑在 estimate.estimate_for）。
+    """
+    if not isinstance(quote, dict) or quote.get("error"):
+        return None
+    if quote.get("tag") != "正式":
+        return None
+    return estimate_for(
+        str(quote.get("fund_code") or ""),
+        quote.get("nav"),
+        quote.get("nav_time"),
+        trading_day=trading_day,
+    )
+
+
+def _apply_estimate(quote: dict, estimate: dict | None) -> dict:
+    """把估算结果套用到报价上：净值、涨跌幅、标签都换成估算值，并保留官方基准。"""
+    if not estimate:
+        return quote
+    if estimate.get("error"):
+        return {**quote, "estimate": estimate}
+    official_nav = quote.get("nav")
+    official_date = quote.get("nav_time")
+    return {
+        **quote,
+        "nav": estimate.get("estimate_nav"),
+        "nav_time": estimate.get("base_date"),
+        "change_pct": estimate.get("change_pct"),
+        "tag": "估算",
+        "nav_kind": "自建盘中估算（仅供参考）",
+        "official_nav": official_nav,
+        "official_nav_date": official_date,
+        "estimate": estimate,
+    }
+
+
 def _portfolio_payload() -> dict:
     holdings = _holdings()
+    market = _market_status()
+    trading_day = bool(market.get("trading_day"))
     with ThreadPoolExecutor(max_workers=min(5, max(1, len(holdings)))) as pool:
         quotes = list(pool.map(_quote_for, holdings)) if holdings else []
+        estimates = list(pool.map(lambda q: _estimate_quote(q, trading_day), quotes)) if quotes else []
     rows = []
     total_value = 0.0
     total_pnl = 0.0
     pnl_complete = bool(holdings)
-    for holding, quote in zip(holdings, quotes):
+    for holding, quote, estimate in zip(holdings, quotes, estimates):
+        quote = _apply_estimate(quote, estimate)
         code = holding["fund_code"]
         nav = quote.get("nav")
         shares = holding.get("shares")
@@ -308,8 +351,12 @@ def _portfolio_payload() -> dict:
         "total_value": round(total_value, 2) if rows and any(r["market_value"] is not None for r in rows) else None,
         "total_pnl": round(total_pnl, 2) if pnl_complete and holdings else None,
         "refreshed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "market": _market_status(),
+        "market": market,
         "quote_cache_seconds": QUOTE_CACHE_SECONDS,
+        "estimate": {
+            "enabled": trading_day,
+            "note": "自建盘中估算：季报重仓股 × 实时股价；未覆盖部分按同比例归一化",
+        },
     }
 
 
@@ -400,6 +447,20 @@ class MoneyAgentHandler(SimpleHTTPRequestHandler):
             return
         if path.startswith("/api/fund/"):
             self._fund_info(unquote(path[len("/api/fund/"):]).strip("/"))
+            return
+        if path.startswith("/api/estimate/"):
+            code = unquote(path[len("/api/estimate/"):]).strip("/")
+            try:
+                code = _validate_code(code)
+            except ValueError as exc:
+                self._send_json(422, {"error": str(exc)})
+                return
+            quote = _quote_for({"fund_code": code})
+            estimate = _estimate_quote(quote, bool(_market_status().get("trading_day")))
+            if estimate is None:
+                self._send_json(404, {"error": "当前不适用盘中估算（非交易日，或今日正式净值已公布）"})
+                return
+            self._send_json(200, {"fund_code": code, "quote": quote, "estimate": estimate})
             return
         if path == "/api/portfolio":
             try:
