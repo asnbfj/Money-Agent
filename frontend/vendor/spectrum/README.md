@@ -12,7 +12,8 @@ python3 frontend/vendor/spectrum/gen_tokens.py path/to/tokens.json frontend/vend
 cp path/to/bundle.css frontend/vendor/spectrum/components.css
 ```
 
-页面样式（`frontend/index.html` 里的 `<style>`）只引用这些 token。两处有意的偏离：
+页面样式（`frontend/index.html` 里的 `<style>`）的颜色只引用这些 token。几处有意的偏离：
 
 - 涨跌按中国市场习惯红涨绿跌，用色相 token `red-900` / `green-900`（文字）和 `red-visual-color` / `green-visual-color`（圆点、图表），不借用 positive / negative 的语义色。
 - 中文占位文字不做斜体（中文没有斜体字形，浏览器会生硬倾斜）；CJK 字体接在 `--font-sans` 之后。
+- 顶部“金库卡”是全页唯一的品牌元素：深色底、金色数字（`yellow-*` 色相）、人民币钞票式扭索纹，主行动“智能分析”在卡内用金色而不是 accent 蓝。金色只用在这张卡里；卡片固定为深底，所以两种主题各取一组金色和涨跌色（对比度 ≥5.5:1）。

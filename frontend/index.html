@@ -5,125 +5,119 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Money Agent 基金工作台</title>
   <script>
-    // 主题：记住的选择优先，否则跟随系统；组件样式里的暗色规则依赖 data-theme
-    (function(){var t=null;try{t=localStorage.getItem('moneyAgent.theme')}catch(e){}
+    // 主题与隐私模式：记住的选择优先，主题否则跟随系统
+    (function(){var d=document.documentElement,t=null,p=null;try{t=localStorage.getItem('moneyAgent.theme');p=localStorage.getItem('moneyAgent.privacy')}catch(e){}
       if(t!=='light'&&t!=='dark')t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
-      document.documentElement.setAttribute('data-theme',t)})();
+      d.setAttribute('data-theme',t);if(p==='1')d.classList.add('privacy')})();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
   <!-- Spectrum 2 设计系统：tokens 由 tokens.json 生成，组件样式来自系统的 bundle.css -->
   <link rel="stylesheet" href="vendor/spectrum/tokens.css">
   <link rel="stylesheet" href="vendor/spectrum/components.css">
   <style>
-    /* 页面层：只引用 Spectrum token。中文页面把 CJK 字体接在 Latin 字体之后。 */
+    /* 页面层：颜色只引用 Spectrum token。金色只用在“金库卡”一处。 */
     :root{
       --font-sans:"Adobe Clean Spectrum VF","Adobe Clean","Source Sans 3","Adobe Clean Han","Source Han Sans SC","PingFang SC","Noto Sans SC","Microsoft YaHei",-apple-system,"Segoe UI",sans-serif;
-      /* 涨跌按中国市场习惯：红涨绿跌。用色相 token（数据可视化用法），不借用 positive/negative 的语义。 */
+      --font-figure:"Adobe Clean Serif","Source Serif 4","Noto Serif SC",Georgia,serif;
       --gain-content:var(--red-900);--loss-content:var(--green-900);
       --gain-visual:var(--red-visual-color);--loss-visual:var(--green-visual-color);
       --gain-subtle:var(--red-subtle-background-color-default);--loss-subtle:var(--green-subtle-background-color-default);
       --chart-line:var(--blue-visual-color);--chart-compare:var(--gray-500);
+      /* 金库卡：始终是深底，所以两种主题各取一组金色与涨跌色（对比度 ≥5.5:1） */
+      --vault-bg:var(--gray-900);--vault-text:var(--white);--vault-sub:var(--transparent-static-white-750);--vault-line:var(--transparent-static-white-150);
+      --gold-hi:var(--yellow-400);--gold:var(--yellow-600);--gold-lo:var(--yellow-800);
+      --vault-gain:var(--red-700);--vault-loss:var(--green-700);
     }
+    [data-theme="dark"]{--vault-bg:var(--gray-75);--gold-hi:var(--yellow-1200);--gold:var(--yellow-1000);--gold-lo:var(--yellow-800);--vault-gain:var(--red-1000);--vault-loss:var(--green-1000)}
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
-    body{margin:0;background:var(--background-base-color);color:var(--neutral-content-color-default);font-family:var(--font-sans);font-size:var(--body-s-font-size);line-height:1.7;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+    body{margin:0;background:var(--background-layer-1-color);color:var(--neutral-content-color-default);font-family:var(--font-sans);font-size:var(--body-s-font-size);line-height:1.7;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
     button,input,select,textarea{font:inherit;color:inherit}
     button{cursor:pointer}
     :focus-visible{outline:var(--border-width-200) solid var(--focus-indicator-color);outline-offset:var(--spacing-50)}
-    .positive{color:var(--gain-content)!important}.negative{color:var(--loss-content)!important}
     input::placeholder,textarea::placeholder{font-style:normal!important}
+    .positive{color:var(--gain-content)!important}.negative{color:var(--loss-content)!important}
     .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
     .ico{width:var(--workflow-icon-medium);height:var(--workflow-icon-medium);flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 
-    .app{min-height:100vh;display:grid;grid-template-columns:232px minmax(0,1fr)}
-
-    /* 侧栏：background-layer-1 + SideNavigation */
-    .sidebar{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:var(--spacing-100);padding:var(--spacing-300) var(--spacing-200);background:var(--background-layer-1-color);border-right:var(--border-width-100) solid var(--gray-200);overflow-y:auto}
-    .brand{display:flex;align-items:center;gap:var(--spacing-200);padding:var(--spacing-100) var(--spacing-200) var(--spacing-300)}
-    .brand-mark{width:32px;height:32px;border-radius:var(--corner-radius-500);display:grid;place-items:center;background:var(--neutral-background-color-default);color:var(--gray-25);font-weight:800;font-size:16px}
-    .brand-name{font-size:var(--title-m-font-size);line-height:1.3;font-weight:700;color:var(--title-color)}
-    .brand-sub{font-size:var(--detail-s-font-size);line-height:1.3;font-weight:500;color:var(--detail-color)}
-    .nav.sp-sidenav{width:auto}
-    .nav button{display:flex;align-items:center;gap:var(--spacing-100);min-height:var(--component-height-100);padding:7px 12px;border:0;border-radius:var(--corner-radius-500);background:transparent;color:var(--neutral-content-color-default);font-size:14px;line-height:18px;text-align:left}
-    .nav button:hover{background:var(--gray-100)}
-    .nav button.active{background:var(--gray-200);font-weight:700}
-    .nav button:focus-visible{outline-offset:calc(-1 * var(--border-width-200))}
-    .nav .count{margin-left:auto;font-size:12px;font-weight:500;color:var(--detail-color)}
-    .side-section{display:flex;align-items:center;justify-content:space-between;margin-top:var(--spacing-300);padding:var(--spacing-100) var(--spacing-200) 4px var(--spacing-200);font-size:12px;line-height:16px;font-weight:500;color:var(--detail-color)}
-    .side-section .sp-action{--h:var(--component-height-75);min-width:var(--component-height-75);padding:0}
-    .watchlist{display:grid;gap:2px}
-    .watch-item{display:flex;align-items:center;justify-content:space-between;gap:var(--spacing-100);min-height:40px;padding:4px 12px;border-radius:var(--corner-radius-500);font-size:14px;line-height:18px}
-    .watch-item:hover{background:var(--gray-100)}
-    .watch-item small{display:block;font-size:12px;line-height:16px;color:var(--detail-color)}
-    .watch-item>span:last-child{font-weight:700}
-    .watch-pending{color:var(--neutral-subdued-content-color-default)}
-    .side-bottom{margin-top:auto;display:grid;gap:var(--spacing-300);padding-top:var(--spacing-300)}
-    .side-bottom .sp-alert{min-width:0;padding:var(--spacing-300)}
-    .profile{display:flex;align-items:center;gap:var(--spacing-200);padding:var(--spacing-200) var(--spacing-200) 0;border-top:var(--border-width-100) solid var(--gray-200)}
-    .profile strong{display:block;font-size:14px;line-height:18px}
-    .profile small{display:block;font-size:12px;line-height:16px;color:var(--detail-color)}
-
-    /* 顶栏 */
-    .main{min-width:0}
-    .topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:var(--spacing-300);height:56px;padding:0 var(--spacing-500);background:var(--background-base-color);border-bottom:var(--border-width-100) solid var(--gray-200)}
+    /* 顶栏：品牌 + 搜索 + 主题 */
+    .topbar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--background-layer-1-color) 88%,transparent);backdrop-filter:blur(12px);border-bottom:var(--border-width-100) solid var(--gray-200)}
+    .topbar-in{max-width:1120px;margin:0 auto;height:60px;padding:0 var(--spacing-400);display:flex;align-items:center;justify-content:space-between;gap:var(--spacing-300)}
+    .brand{display:flex;align-items:center;gap:var(--spacing-200);font-size:var(--title-m-font-size);font-weight:700;color:var(--title-color)}
+    .brand-mark{width:30px;height:30px;border-radius:var(--corner-radius-full);display:grid;place-items:center;background:var(--vault-bg);color:var(--gold);font-family:var(--font-figure);font-weight:700;font-size:16px;box-shadow:inset 0 0 0 1px var(--gold-lo)}
     .top-actions{display:flex;align-items:center;gap:var(--spacing-100)}
-    .top-actions .sp-search{width:260px;border-radius:var(--corner-radius-full);padding-left:12px;gap:4px}
+    .top-actions .sp-search{width:280px;border-radius:var(--corner-radius-full);padding-left:12px;gap:4px;background:var(--background-base-color)}
     .top-actions .sp-search input{padding:0 12px 0 4px}
-    .sp-action .ping{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:var(--corner-radius-full);background:var(--notice-visual-color)}
-    .icon-btn{position:relative}
 
-    .content{max-width:1320px;margin:0 auto;padding:var(--spacing-500) var(--spacing-500) var(--spacing-700)}
-    .heading{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--spacing-400);margin-bottom:var(--spacing-400)}
-    .heading h1{margin:0;font-size:var(--heading-l-font-size);line-height:1.3;font-weight:800;color:var(--heading-color)}
-    .heading p{margin:4px 0 0;max-width:60ch;color:var(--neutral-subdued-content-color-default)}
-    .heading-right{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:var(--spacing-100)}
-    .sp-button .ico{width:16px;height:16px}
+    .content{max-width:1120px;margin:0 auto;padding:var(--spacing-500) var(--spacing-400) var(--spacing-700);display:grid;gap:var(--spacing-400)}
 
-    /* Picker 外观的原生 select */
-    .picker{appearance:none;-webkit-appearance:none;height:var(--component-height-100);padding:0 32px 0 12px;border:var(--border-width-200) solid var(--gray-300);border-radius:var(--corner-radius-500);background:var(--background-base-color) no-repeat right 12px center/10px 10px;color:var(--neutral-content-color-default);font-size:14px;line-height:18px;cursor:pointer;transition:border-color 130ms ease-in-out}
+    /* 金库卡 */
+    .vault{position:relative;isolation:isolate;overflow:hidden;padding:var(--spacing-500) var(--spacing-600) var(--spacing-400);border-radius:var(--corner-radius-800);background:var(--vault-bg);color:var(--vault-text);box-shadow:inset 0 0 0 1px var(--vault-line),var(--drop-shadow-emphasized)}
+    .vault::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(120deg,var(--gold-lo),transparent 30%,transparent 70%,var(--gold-lo));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;opacity:.7}
+    .guilloche{position:absolute;z-index:-1;right:-90px;top:50%;width:420px;height:420px;transform:translateY(-50%);color:var(--gold);opacity:.22;pointer-events:none}
+    .guilloche path{fill:none;stroke:currentColor;stroke-width:.3}
+    .vault-top{display:flex;align-items:center;justify-content:space-between;gap:var(--spacing-200)}
+    .vault-label{display:flex;align-items:center;gap:var(--spacing-100);font-size:var(--detail-m-font-size);font-weight:500;color:var(--vault-sub)}
+    .eye{width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:var(--corner-radius-full);background:transparent;color:var(--vault-sub);transition:background-color 130ms ease-in-out,color 130ms ease-in-out}
+    .eye:hover{background:var(--transparent-static-white-150);color:var(--vault-text)}
+    .eye .closed{display:none}.privacy .eye .open{display:none}.privacy .eye .closed{display:block}
+    .vault .sp-status{min-height:0;font-size:12px;line-height:16px;color:var(--vault-sub)}
+    .vault .refresh-label.loading::before{animation:pulse 1s ease-in-out infinite}
+    .refresh-label>i{display:none}
+    @keyframes pulse{50%{opacity:.3}}
+
+    .ledger-value{position:relative;display:inline-block;margin:var(--spacing-200) 0 var(--spacing-100);font-family:var(--font-figure);font-size:clamp(40px,6vw,64px);line-height:1.15;font-weight:600;letter-spacing:-.5px;color:var(--gold);white-space:nowrap}
+    .ledger-value.pending{color:var(--vault-sub)}
+    /* 金箔扫光：color-dodge 让高光只亮在金色数字上，深色底不受影响 */
+    .ledger-value::after{content:"";position:absolute;inset:-10% -20%;background:linear-gradient(105deg,transparent 40%,var(--gold-hi) 50%,transparent 60%);background-size:250% 100%;background-position:120% 0;mix-blend-mode:color-dodge;pointer-events:none;opacity:0}
+    .ledger-value.shine::after{animation:shine 1.4s cubic-bezier(.3,.6,.3,1)}
+    @keyframes shine{0%{opacity:1;background-position:120% 0}100%{opacity:1;background-position:-20% 0}}
+    .ledger-foot{font-size:12px;line-height:16px;color:var(--vault-sub)}
+    /* 数字变化：只滚动变化的位 */
+    .odo-cell{display:inline-block;height:1.15em;overflow:hidden;vertical-align:bottom;transition:color .6s ease-in-out}
+    .odo-strip{display:block;transition:transform .45s ease-in-out}
+    .odo-strip>span{display:block;height:1.15em;line-height:1.15em;text-align:center}
+    .odo-sym{display:inline-block;line-height:1.15em;vertical-align:bottom}
+    .odo-cents{font-size:.55em}
+    .odo-cell.chg-up{color:var(--vault-gain);transition:none}
+    .odo-cell.chg-down{color:var(--vault-loss);transition:none}
+
+    .vault-stats{display:flex;flex-wrap:wrap;gap:var(--spacing-200) var(--spacing-600);margin:var(--spacing-400) 0 0;padding-top:var(--spacing-300);border-top:var(--border-width-100) solid var(--vault-line)}
+    .vault-stats div{display:flex;flex-direction:column;gap:2px}
+    .vault-stats dt{font-size:12px;line-height:16px;font-weight:500;color:var(--vault-sub)}
+    .vault-stats dd{margin:0;display:flex;align-items:baseline;gap:var(--spacing-100);font-size:var(--title-l-font-size);line-height:1.3;font-weight:700;color:var(--vault-text);white-space:nowrap}
+    .vault-stats dd small{font-size:13px;font-weight:700}
+    .vault .positive{color:var(--vault-gain)!important}.vault .negative{color:var(--vault-loss)!important}
+    #holdingFoot{font-size:12px;line-height:16px;font-weight:500;color:var(--vault-sub)}
+
+    .vault-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--spacing-100);margin-top:var(--spacing-400)}
+    .vault-actions .grow{flex:1}
+    .btn-light{--h:var(--component-height-200);display:inline-flex;align-items:center;gap:8px;height:var(--h);padding:0 18px;border-radius:var(--corner-radius-full);border:var(--border-width-200) solid var(--transparent-static-white-400);background:transparent;color:var(--vault-text);font-size:14px;font-weight:700;transition:background-color 130ms ease-in-out,border-color 130ms ease-in-out,transform 130ms ease-in-out}
+    .btn-light:hover{background:var(--transparent-static-white-150);border-color:var(--transparent-static-white-600)}
+    .btn-gold{--h:var(--component-height-200);display:inline-flex;align-items:center;gap:8px;height:var(--h);padding:0 22px;border:0;border-radius:var(--corner-radius-full);background:linear-gradient(135deg,var(--gold-hi),var(--gold) 55%,var(--gold-lo));color:var(--black);font-size:14px;font-weight:800;box-shadow:inset 0 1px 0 var(--transparent-static-white-500);transition:filter 130ms ease-in-out,transform 130ms ease-in-out}
+    .btn-gold:hover{filter:brightness(1.06)}
+    .btn-light:active,.btn-gold:active{transform:scale(.98)}
+    .btn-light .ico,.btn-gold .ico{width:16px;height:16px}
+    .vault :focus-visible{outline-color:var(--gold-hi)}
+
+    /* 隐私模式：金额模糊，结构仍可见 */
+    .amt,#totalValue{transition:filter 250ms ease-in-out}
+    .privacy .amt,.privacy #totalValue,.privacy #fundRows td:nth-child(2),.privacy #fundRows td:nth-child(3) .change,.privacy #assetAllocationTotal{filter:blur(9px)}
+
+    /* 面板 */
+    .card{background:var(--background-layer-2-color);border:var(--border-width-100) solid var(--gray-200);border-radius:var(--corner-radius-700)}
+    .panel{padding:var(--spacing-400)}
+    .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--spacing-300)}
+    .panel-title{margin:0;font-size:var(--title-l-font-size);line-height:1.3;font-weight:700;color:var(--title-color)}
+    .panel-sub{margin-top:2px;font-size:12px;line-height:16px;color:var(--detail-color)}
+    .picker{appearance:none;-webkit-appearance:none;height:var(--component-height-100);padding:0 32px 0 12px;border:var(--border-width-200) solid var(--gray-300);border-radius:var(--corner-radius-500);background:var(--background-base-color);color:var(--neutral-content-color-default);font-size:14px;line-height:18px;cursor:pointer;transition:border-color 130ms ease-in-out}
     .picker:hover{border-color:var(--gray-400)}
     .picker:focus{outline:none;border-color:var(--gray-800)}
     .picker:focus-visible{outline:var(--border-width-200) solid var(--focus-indicator-color);outline-offset:var(--spacing-50)}
     .picker-wrap{position:relative;display:inline-flex}
     .picker-wrap::after{content:"";position:absolute;right:13px;top:50%;width:6px;height:6px;margin-top:-5px;border-right:2px solid var(--neutral-content-color-default);border-bottom:2px solid var(--neutral-content-color-default);transform:rotate(45deg);pointer-events:none}
-
-    /* 面板：background-layer-2 + 1px gray-200 + corner-radius-700 */
-    .card{background:var(--background-layer-2-color);border:var(--border-width-100) solid var(--gray-200);border-radius:var(--corner-radius-700)}
-    .panel{padding:var(--spacing-400)}
-    .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--spacing-300)}
-    .panel-title{margin:0;font-size:var(--title-m-font-size);line-height:1.3;font-weight:700;color:var(--title-color)}
-    .panel-sub{margin-top:2px;font-size:12px;line-height:16px;color:var(--detail-color)}
-
-    /* 组合概览 */
-    .summary{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,2fr);margin-bottom:var(--spacing-300)}
-    .summary-main{padding:var(--spacing-400);display:flex;flex-direction:column;gap:var(--spacing-100);border-right:var(--border-width-100) solid var(--gray-200)}
-    .summary-label{font-size:var(--detail-m-font-size);line-height:1.3;font-weight:500;color:var(--detail-color)}
-    .ledger-value{font-size:var(--heading-xl-font-size);line-height:1.15;font-weight:800;color:var(--heading-color);letter-spacing:-.5px;white-space:nowrap}
-    .ledger-value.pending{color:var(--disabled-content-color)}
-    .ledger-foot{font-size:14px;line-height:18px;color:var(--neutral-subdued-content-color-default)}
-    .ledger-foot strong{font-weight:700}
-    .ledger-side{margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
-    .ledger-row{padding:var(--spacing-400);display:flex;flex-direction:column;gap:var(--spacing-100);border-right:var(--border-width-100) solid var(--gray-200)}
-    .ledger-row:last-child{border-right:0}
-    .ledger-row dt{font-size:var(--detail-m-font-size);line-height:1.3;font-weight:500;color:var(--detail-color)}
-    .ledger-row dd{margin:0}
-    .ledger-num{display:block;font-size:var(--title-xxl-font-size);line-height:1.3;font-weight:700;color:var(--title-color);white-space:nowrap}
-    .ledger-num small{font-size:14px;font-weight:500;color:var(--neutral-subdued-content-color-default);margin-left:2px}
-    .ledger-sub{display:block;margin-top:2px;font-size:12px;line-height:16px;color:var(--neutral-subdued-content-color-default)}
-    .ledger-sub strong{font-weight:700}
-
-    /* 数字变化：只滚动变化的位，说明数值更新 */
-    .odo-cell{display:inline-block;height:1.15em;overflow:hidden;vertical-align:bottom;transition:color .6s ease-in-out}
-    .odo-strip{display:block;transition:transform .45s ease-in-out}
-    .odo-strip>span{display:block;height:1.15em;line-height:1.15em;text-align:center}
-    .odo-sym{display:inline-block;line-height:1.15em;vertical-align:bottom}
-    .odo-cents{font-size:.6em}
-    .odo-cell.odo-cents,.odo-sym.odo-cents{height:1.15em;line-height:1.15em}
-    .odo-cell.odo-cents .odo-strip>span{height:1.15em;line-height:1.15em}
-    .odo-cell.chg-up{color:var(--gain-content);transition:none}
-    .odo-cell.chg-down{color:var(--loss-content);transition:none}
 
     /* 持仓表：Spectrum Table */
     .table-panel{overflow:hidden;margin-bottom:var(--spacing-300)}
@@ -283,33 +277,29 @@
     .review-tools{display:flex;align-items:center;justify-content:space-between;gap:var(--spacing-200);margin-top:var(--spacing-200)}
     .local-note{margin-top:var(--spacing-200);font-size:12px;line-height:1.6;color:var(--neutral-subdued-content-color-default)}
 
+
+    /* 精简后的表格：操作按钮悬停或聚焦时才出现 */
+    .table-panel{margin:0}
+    .row-action{opacity:0;transition:opacity 130ms ease-in-out}
+    tbody tr:hover .row-action,.row-action:focus-visible,.row-action[aria-expanded="true"]{opacity:1}
+    @media (hover:none){.row-action{opacity:1}}
+    .layout{margin:0}
+    .footnote{margin:0;max-width:90ch;font-size:12px;line-height:1.7;color:var(--detail-color)}
+
     @media (prefers-reduced-motion:reduce){
-      .odo-strip,.toast{transition:none}
-      tbody td.tick-up,tbody td.tick-down,.refresh-label.loading::before{animation:none}
+      .odo-strip,.toast,.amt,#totalValue{transition:none}
+      .ledger-value.shine::after,tbody td.tick-up,tbody td.tick-down,.refresh-label.loading::before{animation:none}
     }
-    @media (max-width:1120px){
-      .app{grid-template-columns:200px minmax(0,1fr)}
-      .content{padding:var(--spacing-400) var(--spacing-400) var(--spacing-600)}.topbar{padding:0 var(--spacing-400)}
-      .heading{flex-direction:column;align-items:flex-start}.heading-right{justify-content:flex-start}
-      .summary{grid-template-columns:1fr}.summary-main{border-right:0;border-bottom:var(--border-width-100) solid var(--gray-200)}
-      .layout{grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr)}
-    }
-    @media (max-width:860px){.layout,.bottom-grid{grid-template-columns:1fr}}
-    @media (max-width:780px){
-      .app{grid-template-columns:minmax(0,1fr)}
-      .sidebar{position:relative;height:auto;min-width:0;padding:var(--spacing-200) var(--spacing-300);border-right:0;border-bottom:var(--border-width-100) solid var(--gray-200)}
-      .brand{padding:0 0 var(--spacing-100)}
-      .side-section,.watchlist,.side-bottom{display:none}
-      .nav.sp-sidenav{flex-direction:row;overflow-x:auto}
-      .nav button{white-space:nowrap}
-      .topbar{position:relative;padding:0 var(--spacing-300)}
+    @media (max-width:860px){.layout{grid-template-columns:1fr}}
+    @media (max-width:680px){
+      .topbar-in{padding:0 var(--spacing-300)}
+      .brand span:not(.brand-mark){display:none}
       .top-actions{flex:1;justify-content:flex-end}.top-actions .sp-search{width:auto;flex:1;min-width:0}
-      .crumbs-wrap{display:none}
-      .content{padding:var(--spacing-300) var(--spacing-300) var(--spacing-500)}
-      .heading-right{width:100%}
-      .ledger-side{grid-template-columns:1fr}
-      .ledger-row{border-right:0;border-bottom:var(--border-width-100) solid var(--gray-200);flex-direction:row;justify-content:space-between;align-items:baseline;padding:var(--spacing-300) var(--spacing-400)}
-      .ledger-row:last-child{border-bottom:0}.ledger-row dd{text-align:end}
+      .content{padding:var(--spacing-300) var(--spacing-300) var(--spacing-500);gap:var(--spacing-300)}
+      .vault{padding:var(--spacing-400) var(--spacing-300) var(--spacing-300)}
+      .guilloche{width:300px;height:300px;right:-120px;top:30%}
+      .vault-stats{gap:var(--spacing-200) var(--spacing-400)}
+      .vault-actions .grow{display:none}.vault-actions .btn-gold{width:100%;justify-content:center;order:-1}
       .table-head{flex-direction:column;align-items:stretch;padding:var(--spacing-300)}
       .table-tools{justify-content:flex-start}.table-search{flex:1 1 140px;width:auto}
       thead th:first-child,tbody td:first-child{padding-left:var(--spacing-300)}
@@ -323,136 +313,94 @@
 </head>
 <body class="sp-root">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-overview" viewBox="0 0 18 18"><rect x="2.5" y="2.5" width="5.5" height="5.5" rx="1.2"/><rect x="10" y="2.5" width="5.5" height="5.5" rx="1.2"/><rect x="2.5" y="10" width="5.5" height="5.5" rx="1.2"/><rect x="10" y="10" width="5.5" height="5.5" rx="1.2"/></symbol>
-  <symbol id="i-holdings" viewBox="0 0 18 18"><path d="M3 4.5h12M3 9h12M3 13.5h8"/></symbol>
-  <symbol id="i-chart" viewBox="0 0 18 18"><path d="M2.5 13.5l4-4.5 3.5 3L15.5 5"/><path d="M11.5 5h4v4"/></symbol>
-  <symbol id="i-report" viewBox="0 0 18 18"><path d="M4.5 2h6.5L14 5v11H4.5z"/><path d="M10.5 2v3.5H14M6.8 9.5h4.8M6.8 12.3h3.2"/></symbol>
   <symbol id="i-search" viewBox="0 0 18 18"><path d="M7.5 13a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11Z"/><path d="m11.5 11.5 5 5"/></symbol>
-  <symbol id="i-bell" viewBox="0 0 18 18"><path d="M4.5 12.5V8a4.5 4.5 0 0 1 9 0v4.5l1.2 1.5H3.3z"/><path d="M7.3 16a1.8 1.8 0 0 0 3.4 0"/></symbol>
   <symbol id="i-plus" viewBox="0 0 18 18"><path d="M9 3v12M3 9h12"/></symbol>
   <symbol id="i-upload" viewBox="0 0 18 18"><path d="M9 11.5V3M5.8 6.2 9 3l3.2 3.2M3 11.5V15h12v-3.5"/></symbol>
   <symbol id="i-download" viewBox="0 0 18 18"><path d="M9 3v8.5M5.8 8.3 9 11.5l3.2-3.2M3 11.5V15h12v-3.5"/></symbol>
   <symbol id="i-spark" viewBox="0 0 18 18"><path d="M9 2l1.8 5.2L16 9l-5.2 1.8L9 16l-1.8-5.2L2 9l5.2-1.8z"/></symbol>
   <symbol id="i-theme" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6.5"/><path d="M9 2.5v13A6.5 6.5 0 0 0 9 2.5Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 18 18"><path d="M6 3v12M3 12l3 3 3-3M12 15V3M9 6l3-3 3 3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 18 18"><path d="M1.5 9S4.2 3.8 9 3.8 16.5 9 16.5 9 13.8 14.2 9 14.2 1.5 9 1.5 9Z"/><circle cx="9" cy="9" r="2.4"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 18 18"><path d="M3 3l12 12M7.3 4.1A7.6 7.6 0 0 1 9 3.8c4.8 0 7.5 5.2 7.5 5.2a13 13 0 0 1-2.2 2.8M11.6 13.6A6.9 6.9 0 0 1 9 14.2C4.2 14.2 1.5 9 1.5 9a13 13 0 0 1 2.9-3.4"/></symbol>
   <symbol id="i-image" viewBox="0 0 48 48"><rect x="6" y="9" width="36" height="30" rx="4"/><circle cx="17" cy="19" r="3.5"/><path d="M6 33l10-9 8 7 6-5 12 10"/></symbol>
 </svg>
-<div class="app">
-  <aside class="sidebar">
-    <div class="brand"><div class="brand-mark" aria-hidden="true">¥</div><div><div class="brand-name">Money Agent</div><div class="brand-sub">基金项目部</div></div></div>
-    <nav class="nav sp-sidenav" aria-label="主导航">
-      <button class="active" data-view="总览"><svg class="ico"><use href="#i-overview"/></svg>项目总览</button>
-      <button data-view="基金持仓"><svg class="ico"><use href="#i-holdings"/></svg>基金持仓<span class="count">8</span></button>
-      <button data-view="数据分析"><svg class="ico"><use href="#i-chart"/></svg>收益与配置</button>
-      <button data-view="研究报告"><svg class="ico"><use href="#i-report"/></svg>智能分析</button>
-    </nav>
-    <div class="side-section">自选观察<button class="sp-action quiet sp-focusable" aria-label="添加自选" id="addWatch"><svg class="ico" style="width:14px;height:14px"><use href="#i-plus"/></svg></button></div>
-    <div class="watchlist">
-      <div class="watch-item"><span>沪深 300<small>000300 指数</small></span><span class="negative">−0.42%</span></div>
-      <div class="watch-item"><span>中证人工智能<small>930713 指数</small></span><span class="positive">+1.26%</span></div>
-      <div class="watch-item"><span>黄金主题<small>518800 ETF</small></span><span class="positive">+0.38%</span></div>
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">¥</span><span>Money Agent</span></div>
+    <div class="top-actions">
+      <label class="sp-fbox sp-search"><svg class="sp-ico ico" style="width:16px;height:16px;color:var(--neutral-subdued-content-color-default)"><use href="#i-search"/></svg><input id="globalSearch" type="search" placeholder="搜索基金名称或代码" aria-label="搜索基金"></label>
+      <button class="sp-action quiet sp-focusable" id="themeToggle" aria-label="切换浅色或深色主题"><svg class="ico"><use href="#i-theme"/></svg></button>
     </div>
-    <div class="side-bottom">
-      <div class="sp-alert subtle" role="status" style="--line:var(--informative-visual-color);--subtle:var(--blue-subtle-background-color-default)"><div class="hd" id="portfolioStatus">演示模式</div><div class="bd" id="portfolioStatusDetail" style="font-size:12px;line-height:1.6">页面数字是示例数据。导入持仓截图后，会换成你的真实持仓。</div></div>
-      <div class="profile"><span class="sp-avatar" style="--s:32px;--abg:var(--celery-background-color-default, var(--gray-200));--afg:var(--black)" aria-hidden="true">林</span><div><strong>林经理</strong><small>基金项目部</small></div></div>
+  </div>
+</header>
+<main class="content">
+  <section class="vault heading" aria-label="组合总资产">
+    <svg class="guilloche" id="guilloche" viewBox="-100 -100 200 200" aria-hidden="true"></svg>
+    <div class="vault-top">
+      <div class="vault-label">组合总资产<button class="eye" id="privacyToggle" aria-pressed="false" aria-label="隐藏金额"><svg class="ico open" style="width:16px;height:16px"><use href="#i-eye"/></svg><svg class="ico closed" style="width:16px;height:16px"><use href="#i-eye-off"/></svg></button></div>
+      <div class="refresh-label sp-status" id="refreshLabel" style="--dot:var(--neutral-visual-color)"><i></i><span>示例数据</span></div>
     </div>
-  </aside>
-  <main class="main">
-    <header class="topbar">
-      <nav class="crumbs-wrap" aria-label="位置"><ol class="sp-crumbs"><li>基金项目部<svg viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 1 5.5 4l-3 3"/></svg></li><li><span class="cur" id="crumbView">项目总览</span></li></ol></nav>
-      <div class="top-actions">
-        <label class="sp-fbox sp-search"><svg class="sp-ico ico" style="width:16px;height:16px;color:var(--neutral-subdued-content-color-default)"><use href="#i-search"/></svg><input id="globalSearch" type="search" placeholder="搜索基金名称或代码" aria-label="搜索基金"></label>
-        <button class="sp-action quiet sp-focusable" id="themeToggle" aria-label="切换浅色或深色主题"><svg class="ico"><use href="#i-theme"/></svg></button>
-        <button class="sp-action quiet sp-focusable icon-btn" id="notify" aria-label="通知"><svg class="ico"><use href="#i-bell"/></svg><i class="ping"></i></button>
+    <div class="ledger-value pending" id="totalValue" aria-live="polite">¥ ——</div>
+    <div class="ledger-foot" id="assetFoot">示例组合。导入支付宝持仓截图后显示你的真实资产。</div>
+    <dl class="vault-stats">
+      <div><dt>今日收益</dt><dd><span class="amt positive" id="todayPnl">+¥ 1,286.40</span><small class="positive" id="todayChange">+0.45%</small></dd></div>
+      <div><dt>累计收益</dt><dd><span class="amt positive" id="totalPnl">+¥ 24,680.52</span><small class="positive" id="totalPnlPct">+9.43%</small></dd></div>
+      <div><dt>持有基金</dt><dd><span id="fundCount">08<small>只</small></span><span id="holdingFoot">覆盖 5 个资产主题</span></dd></div>
+    </dl>
+    <div class="vault-actions">
+      <input id="importFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+      <button class="btn-light" id="importBtn"><svg class="ico"><use href="#i-upload"/></svg>导入截图</button>
+      <button class="btn-light" id="addHoldingBtn"><svg class="ico"><use href="#i-plus"/></svg>添加持仓</button>
+      <span class="grow"></span>
+      <button class="btn-gold" id="analyzeBtn"><svg class="ico"><use href="#i-spark"/></svg>智能分析</button>
+    </div>
+  </section>
+
+  <section class="card table-panel">
+    <div class="table-head">
+      <div><h2 class="panel-title">我的基金</h2><div class="panel-sub" id="holdingsSubtitle">持有金额、收益和今日涨跌。导入截图后会自动同步。</div></div>
+      <div class="table-tools">
+        <span class="picker-wrap"><select class="picker" id="refreshSelect" aria-label="估值刷新间隔"><option value="15000">每 15 秒刷新</option><option value="30000">每 30 秒刷新</option><option value="60000">每 60 秒刷新</option><option value="0">手动刷新</option></select></span>
+        <label class="sp-fbox sp-search table-search"><svg class="sp-ico ico" style="width:16px;height:16px;color:var(--neutral-subdued-content-color-default)"><use href="#i-search"/></svg><input id="tableSearch" type="search" placeholder="筛选基金" aria-label="筛选基金"></label>
+        <button class="sp-action sp-focusable" id="sortBtn">按金额排序</button>
+        <button class="sp-action quiet sp-focusable" id="exportBtn" aria-label="导出持仓 CSV" title="导出持仓 CSV"><svg class="ico"><use href="#i-download"/></svg></button>
       </div>
-    </header>
-    <div class="content">
-      <section class="heading">
-        <div><h1>项目总览</h1><p id="portfolioCaption">当前是示例组合。导入支付宝持仓截图，或手动添加持仓，即可看到你自己的估值和盈亏。</p></div>
-        <div class="heading-right">
-          <span class="picker-wrap"><select class="picker" id="portfolioSelect" aria-label="选择组合"><option>示例组合</option></select></span>
-          <input id="importFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
-          <button class="sp-button sp-focusable v-secondary f-outline" id="addHoldingBtn"><svg class="ico"><use href="#i-plus"/></svg>添加持仓</button>
-          <button class="sp-button sp-focusable v-secondary f-outline" id="importBtn"><svg class="ico"><use href="#i-upload"/></svg>导入截图</button>
-          <button class="sp-button sp-focusable v-secondary f-outline" id="exportBtn"><svg class="ico"><use href="#i-download"/></svg><span>导出示例数据</span></button>
-          <button class="sp-button sp-focusable v-accent f-fill" id="analyzeBtn"><svg class="ico"><use href="#i-spark"/></svg>智能分析</button>
-        </div>
-      </section>
-
-      <section class="card summary" aria-label="组合概览">
-        <div class="summary-main">
-          <div class="summary-label">组合总资产</div>
-          <div class="ledger-value pending" id="totalValue" aria-live="polite">¥ ——</div>
-          <div class="ledger-foot" id="assetFoot">较上一交易日 <strong class="positive">+¥ 1,286.40（+0.45%）</strong></div>
-        </div>
-        <dl class="ledger-side">
-          <div class="ledger-row"><dt>累计收益</dt><dd><span class="ledger-num positive" id="totalPnl">+¥ 24,680.52</span><span class="ledger-sub">持有收益率 <strong class="positive" id="totalPnlPct">+9.43%</strong></span></dd></div>
-          <div class="ledger-row"><dt>今日收益</dt><dd><span class="ledger-num positive" id="todayPnl">+¥ 1,286.40</span><span class="ledger-sub">估算日涨跌 <strong class="positive" id="todayChange">+0.45%</strong></span></dd></div>
-          <div class="ledger-row"><dt>持有基金</dt><dd><span class="ledger-num" id="fundCount">08<small>只</small></span><span class="ledger-sub" id="holdingFoot">覆盖 5 个资产主题</span></dd></div>
-        </dl>
-      </section>
-
-      <section class="card table-panel">
-        <div class="table-head">
-          <div><h2 class="panel-title">我的基金</h2><div class="panel-sub" id="holdingsSubtitle">持有金额、收益和最新净值。导入截图后会自动同步。</div><div class="refresh-label sp-status" id="refreshLabel" style="--dot:var(--neutral-visual-color)"><i></i><span>示例数据</span></div></div>
-          <div class="table-tools">
-            <span class="picker-wrap"><select class="picker" id="refreshSelect" aria-label="估值刷新间隔"><option value="15000">每 15 秒刷新</option><option value="30000">每 30 秒刷新</option><option value="60000">每 60 秒刷新</option><option value="0">手动刷新</option></select></span>
-            <label class="sp-fbox sp-search table-search"><svg class="sp-ico ico" style="width:16px;height:16px;color:var(--neutral-subdued-content-color-default)"><use href="#i-search"/></svg><input id="tableSearch" type="search" placeholder="筛选基金" aria-label="筛选基金"></label>
-            <button class="sp-action sp-focusable filter-btn" id="sortBtn">↕ 排序</button>
-            <button class="sp-action sp-focusable filter-btn" id="allFunds">全部基金</button>
-          </div>
-        </div>
-        <div class="table-scroll"><table><thead><tr><th>基金名称</th><th>持有金额</th><th>持有收益</th><th>日涨跌</th><th>最新净值</th><th>估值口径</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="fundRows">
-        <tr data-name="易方达沪深300etf联接a 110020"><td><div class="fund-name"><div class="fund-avatar">宽</div><div><strong>易方达沪深 300 ETF 联接 A</strong><small>110020 指数型</small></div></div></td><td class="mono">¥ 82,460.20</td><td><span class="change positive">+¥ 6,320.40</span><br><small class="positive">+8.30%</small></td><td><span class="change negative">−0.42%</span></td><td class="mono">1.8426</td><td><span class="tag">中风险</span></td><td><button class="row-action row-menu-btn" data-code="110020" data-name="易方达沪深 300 ETF 联接 A" aria-label="更多操作">···</button></td></tr>
-        <tr data-name="华夏国证半导体芯片etf联接c 008887"><td><div class="fund-name"><div class="fund-avatar">芯</div><div><strong>华夏国证半导体芯片 ETF 联接 C</strong><small>008887 行业指数</small></div></div></td><td class="mono">¥ 56,820.10</td><td><span class="change positive">+¥ 8,716.80</span><br><small class="positive">+18.13%</small></td><td><span class="change positive">+1.28%</span></td><td class="mono">1.5623</td><td><span class="tag warn">高风险</span></td><td><button class="row-action row-menu-btn" data-code="008887" data-name="华夏国证半导体芯片 ETF 联接 C" aria-label="更多操作">···</button></td></tr>
-        <tr data-name="广发中证消费etf联接c 009329"><td><div class="fund-name"><div class="fund-avatar">消</div><div><strong>广发中证消费 ETF 联接 C</strong><small>009329 行业指数</small></div></div></td><td class="mono">¥ 48,260.22</td><td><span class="change negative">−¥ 1,140.32</span><br><small class="negative">−2.31%</small></td><td><span class="change positive">+0.36%</span></td><td class="mono">0.9238</td><td><span class="tag">中风险</span></td><td><button class="row-action row-menu-btn" data-code="009329" data-name="广发中证消费 ETF 联接 C" aria-label="更多操作">···</button></td></tr>
-        <tr data-name="南方中证全债指数a 202101"><td><div class="fund-name"><div class="fund-avatar">债</div><div><strong>南方中证全债指数 A</strong><small>202101 债券型</small></div></div></td><td class="mono">¥ 40,372.00</td><td><span class="change positive">+¥ 1,182.00</span><br><small class="positive">+3.02%</small></td><td><span class="change positive">+0.08%</span></td><td class="mono">1.2864</td><td><span class="tag">低风险</span></td><td><button class="row-action row-menu-btn" data-code="202101" data-name="南方中证全债指数 A" aria-label="更多操作">···</button></td></tr>
-        <tr data-name="富国中证人工智能主题etf联接c 012900"><td><div class="fund-name"><div class="fund-avatar">智</div><div><strong>富国中证人工智能主题 ETF 联接 C</strong><small>012900 主题指数</small></div></div></td><td class="mono">¥ 32,518.00</td><td><span class="change positive">+¥ 5,202.00</span><br><small class="positive">+19.04%</small></td><td><span class="change positive">+1.26%</span></td><td class="mono">1.6721</td><td><span class="tag warn">高风险</span></td><td><button class="row-action row-menu-btn" data-code="012900" data-name="富国中证人工智能主题 ETF 联接 C" aria-label="更多操作">···</button></td></tr>
-        <tr data-name="景顺长城新能源产业股票c 011328"><td><div class="fund-name"><div class="fund-avatar">新</div><div><strong>景顺长城新能源产业股票 C</strong><small>011328 股票型</small></div></div></td><td class="mono">¥ 26,840.60</td><td><span class="change negative">−¥ 2,340.60</span><br><small class="negative">−8.02%</small></td><td><span class="change negative">−1.15%</span></td><td class="mono">2.1420</td><td><span class="tag warn">高风险</span></td><td><button class="row-action row-menu-btn" data-code="011328" data-name="景顺长城新能源产业股票 C" aria-label="更多操作">···</button></td></tr>
-        <tr data-name="鹏华丰禄债券 003547"><td><div class="fund-name"><div class="fund-avatar">固</div><div><strong>鹏华丰禄债券</strong><small>003547 债券型</small></div></div></td><td class="mono">¥ 18,920.00</td><td><span class="change positive">+¥ 428.00</span><br><small class="positive">+2.31%</small></td><td><span class="change positive">+0.04%</span></td><td class="mono">1.1042</td><td><span class="tag">低风险</span></td><td><button class="row-action row-menu-btn" data-code="003547" data-name="鹏华丰禄债券" aria-label="更多操作">···</button></td></tr>
-        <tr data-name="华宝中证医疗etf联接c 012323"><td><div class="fund-name"><div class="fund-avatar">医</div><div><strong>华宝中证医疗 ETF 联接 C</strong><small>012323 行业指数</small></div></div></td><td class="mono">¥ 21,460.30</td><td><span class="change negative">−¥ 3,180.30</span><br><small class="negative">−12.91%</small></td><td><span class="change negative">−0.63%</span></td><td class="mono">0.7845</td><td><span class="tag">中风险</span></td><td><button class="row-action row-menu-btn" data-code="012323" data-name="华宝中证医疗 ETF 联接 C" aria-label="更多操作">···</button></td></tr>
-        </tbody></table><div class="empty" id="emptyState">没有找到匹配的基金</div></div>
-        <div class="table-foot"><span id="tableSummary">展示 8 只，共 8 只</span><div class="pages" id="pager"></div></div>
-      </section>
-
-      <section class="layout">
-        <article class="card panel">
-          <div class="panel-head"><div><h2 class="panel-title" id="chartTitle">组合收益走势</h2><div class="panel-sub" id="chartCaption">示例走势，不代表真实持仓表现</div></div><div class="sp-segctl segmented" id="rangeSwitch" role="group" aria-label="时间范围"><button data-range="1M">1月</button><button data-range="3M" class="active sel">3月</button><button data-range="6M">6月</button><button data-range="1Y">1年</button><button data-range="ALL">全部</button></div></div>
-          <div class="chart-summary"><div><span>区间收益</span><strong class="positive">+8.72%</strong></div><div><span>年化收益</span><strong>+12.36%</strong></div><div><span>最大回撤</span><strong class="negative">−4.18%</strong></div></div>
-          <div class="chart-wrap"><svg viewBox="0 0 720 190" role="img" aria-label="示例组合收益走势图"><defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop class="fill-stop" offset="0" stop-opacity=".14"/><stop class="fill-stop" offset="1" stop-opacity="0"/></linearGradient></defs><line class="gridline" x1="42" x2="710" y1="25" y2="25"/><line class="gridline" x1="42" x2="710" y1="65" y2="65"/><line class="gridline" x1="42" x2="710" y1="105" y2="105"/><line class="gridline" x1="42" x2="710" y1="145" y2="145"/><text class="axis" x="0" y="28">+12%</text><text class="axis" x="5" y="68">+8%</text><text class="axis" x="5" y="108">+4%</text><text class="axis" x="14" y="148">0%</text><text class="axis" x="42" y="179">07.12</text><text class="axis" x="204" y="179">08.04</text><text class="axis" x="370" y="179">08.27</text><text class="axis" x="536" y="179">09.19</text><text class="axis" x="680" y="179">10.12</text><path class="chart-area" d="M42 139 C61 136 65 118 85 124 S115 132 132 111 S155 105 172 113 S201 96 217 105 S244 94 259 87 S284 98 302 85 S328 93 348 77 S376 81 394 66 S421 73 438 62 S466 77 482 59 S510 70 527 54 S555 62 572 50 S598 63 616 41 S643 52 660 36 S690 43 710 26 L710 158 L42 158Z"/><path class="chart-line-compare" d="M42 143 C86 138 105 146 143 136 S206 142 250 129 S312 134 357 119 S420 124 466 109 S532 118 572 103 S627 110 663 92 S689 98 710 87"/><path class="chart-line" d="M42 139 C61 136 65 118 85 124 S115 132 132 111 S155 105 172 113 S201 96 217 105 S244 94 259 87 S284 98 302 85 S328 93 348 77 S376 81 394 66 S421 73 438 62 S466 77 482 59 S510 70 527 54 S555 62 572 50 S598 63 616 41 S643 52 660 36 S690 43 710 26"/></svg></div>
-          <div class="legend"><span><i></i>示例组合</span><span><i></i>沪深 300 基准</span></div>
-        </article>
-        <article class="card panel">
-          <div class="panel-head"><div><h2 class="panel-title">资产配置</h2><div class="panel-sub" id="allocationCaption">示例比例</div></div></div>
-          <div class="alloc-total"><small>总市值</small><span id="assetAllocationTotal">¥286,430</span></div>
-          <div class="alloc-list">
-            <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="32.4" style="--mfill:var(--blue-visual-color)"><span class="lab">宽基指数</span><span class="val">32.4%</span><div class="track"><div class="fill" style="width:32.4%"></div></div></div>
-            <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="23.6" style="--mfill:var(--indigo-visual-color)"><span class="lab">科技成长</span><span class="val">23.6%</span><div class="track"><div class="fill" style="width:23.6%"></div></div></div>
-            <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="18.7" style="--mfill:var(--seafoam-visual-color)"><span class="lab">消费主题</span><span class="val">18.7%</span><div class="track"><div class="fill" style="width:18.7%"></div></div></div>
-            <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="14.1" style="--mfill:var(--orange-visual-color)"><span class="lab">债券固收</span><span class="val">14.1%</span><div class="track"><div class="fill" style="width:14.1%"></div></div></div>
-            <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="11.2" style="--mfill:var(--gray-500)"><span class="lab">其他</span><span class="val">11.2%</span><div class="track"><div class="fill" style="width:11.2%"></div></div></div>
-          </div>
-          <div class="alloc-foot"><span>资产分散度</span><strong id="allocationFoot">示例数据</strong></div>
-        </article>
-      </section>
-
-      <section class="bottom-grid">
-        <article class="card panel">
-          <div class="panel-head"><div><h2 class="panel-title">近期动态</h2><div class="panel-sub">组合里值得留意的变化</div></div><button class="sp-action sp-focusable" id="activityMore">让 Agent 总结</button></div>
-          <div class="activity-list">
-            <div class="activity"><i class="activity-ico up"></i><div class="activity-main"><strong>人工智能主题</strong>今日领涨，盘中估算 +1.26%<small>持仓市值 ¥32,518.00</small></div><time>15:02</time></div>
-            <div class="activity"><i class="activity-ico risk"></i><div class="activity-main"><strong>配置提醒</strong>科技成长类占比接近你设定的关注线<small>当前占比 23.6%，请结合自身情况判断</small></div><time>09:30</time></div>
-            <div class="activity"><i class="activity-ico note"></i><div class="activity-main"><strong>半导体行业</strong>新增 3 篇券商研报摘要<small>来源：公开券商研究报告</small></div><time>周四</time></div>
-          </div>
-        </article>
-        <article class="insight">
-          <div><h3>想知道一只基金最近表现如何？</h3><p>输入名称或代码，Agent 会整理净值走势、回撤和你的持仓盈亏。基于公开历史数据，不构成投资建议。</p></div>
-          <button class="sp-button sp-focusable v-secondary f-fill" id="insightAnalyze" style="align-self:flex-start">分析一只基金</button>
-        </article>
-      </section>
-      <div class="sp-alert subtle disclaimer" role="note" style="--line:var(--informative-visual-color);--subtle:var(--background-layer-1-color)"><div class="hd">数据说明</div><div class="bd" id="disclaimerText">总资产、收益走势、持仓列表和近期动态目前都是示例数据，尚未接入真实账户。“智能分析”会调用本地 Agent 和公开行情接口。盘中估值仅供参考，历史表现不代表未来收益，分析内容不构成投资建议。</div></div>
     </div>
-  </main>
-</div>
+    <div class="table-scroll"><table><thead><tr><th>基金</th><th>持有金额</th><th>持有收益</th><th>今日</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="fundRows">
+    <tr data-name="易方达沪深300etf联接a 110020"><td><div class="fund-name"><div class="fund-avatar">易</div><div><strong>易方达沪深 300 ETF 联接 A</strong><small>110020 · 正式净值 1.8426</small></div></div></td><td class="mono">¥ 82,460.20</td><td><span class="change positive">+¥ 6,320.40</span><br><small class="positive">+8.30%</small></td><td><span class="change negative">−0.42%</span></td><td><button class="row-action row-menu-btn" data-code="110020" data-name="易方达沪深 300 ETF 联接 A" aria-label="更多操作">···</button></td></tr>
+    <tr data-name="华夏国证半导体芯片etf联接c 008887"><td><div class="fund-name"><div class="fund-avatar">华</div><div><strong>华夏国证半导体芯片 ETF 联接 C</strong><small>008887 · 正式净值 1.5623</small></div></div></td><td class="mono">¥ 56,820.10</td><td><span class="change positive">+¥ 8,716.80</span><br><small class="positive">+18.13%</small></td><td><span class="change positive">+1.28%</span></td><td><button class="row-action row-menu-btn" data-code="008887" data-name="华夏国证半导体芯片 ETF 联接 C" aria-label="更多操作">···</button></td></tr>
+    <tr data-name="广发中证消费etf联接c 009329"><td><div class="fund-name"><div class="fund-avatar">广</div><div><strong>广发中证消费 ETF 联接 C</strong><small>009329 · 正式净值 0.9238</small></div></div></td><td class="mono">¥ 48,260.22</td><td><span class="change negative">−¥ 1,140.32</span><br><small class="negative">−2.31%</small></td><td><span class="change positive">+0.36%</span></td><td><button class="row-action row-menu-btn" data-code="009329" data-name="广发中证消费 ETF 联接 C" aria-label="更多操作">···</button></td></tr>
+    <tr data-name="南方中证全债指数a 202101"><td><div class="fund-name"><div class="fund-avatar">南</div><div><strong>南方中证全债指数 A</strong><small>202101 · 正式净值 1.2864</small></div></div></td><td class="mono">¥ 40,372.00</td><td><span class="change positive">+¥ 1,182.00</span><br><small class="positive">+3.02%</small></td><td><span class="change positive">+0.08%</span></td><td><button class="row-action row-menu-btn" data-code="202101" data-name="南方中证全债指数 A" aria-label="更多操作">···</button></td></tr>
+    <tr data-name="富国中证人工智能主题etf联接c 012900"><td><div class="fund-name"><div class="fund-avatar">富</div><div><strong>富国中证人工智能主题 ETF 联接 C</strong><small>012900 · 正式净值 1.6721</small></div></div></td><td class="mono">¥ 32,518.00</td><td><span class="change positive">+¥ 5,202.00</span><br><small class="positive">+19.04%</small></td><td><span class="change positive">+1.26%</span></td><td><button class="row-action row-menu-btn" data-code="012900" data-name="富国中证人工智能主题 ETF 联接 C" aria-label="更多操作">···</button></td></tr>
+    <tr data-name="景顺长城新能源产业股票c 011328"><td><div class="fund-name"><div class="fund-avatar">景</div><div><strong>景顺长城新能源产业股票 C</strong><small>011328 · 正式净值 2.1420</small></div></div></td><td class="mono">¥ 26,840.60</td><td><span class="change negative">−¥ 2,340.60</span><br><small class="negative">−8.02%</small></td><td><span class="change negative">−1.15%</span></td><td><button class="row-action row-menu-btn" data-code="011328" data-name="景顺长城新能源产业股票 C" aria-label="更多操作">···</button></td></tr>
+    <tr data-name="鹏华丰禄债券 003547"><td><div class="fund-name"><div class="fund-avatar">鹏</div><div><strong>鹏华丰禄债券</strong><small>003547 · 正式净值 1.1042</small></div></div></td><td class="mono">¥ 18,920.00</td><td><span class="change positive">+¥ 428.00</span><br><small class="positive">+2.31%</small></td><td><span class="change positive">+0.04%</span></td><td><button class="row-action row-menu-btn" data-code="003547" data-name="鹏华丰禄债券" aria-label="更多操作">···</button></td></tr>
+    <tr data-name="华宝中证医疗etf联接c 012323"><td><div class="fund-name"><div class="fund-avatar">华</div><div><strong>华宝中证医疗 ETF 联接 C</strong><small>012323 · 正式净值 0.7845</small></div></div></td><td class="mono">¥ 21,460.30</td><td><span class="change negative">−¥ 3,180.30</span><br><small class="negative">−12.91%</small></td><td><span class="change negative">−0.63%</span></td><td><button class="row-action row-menu-btn" data-code="012323" data-name="华宝中证医疗 ETF 联接 C" aria-label="更多操作">···</button></td></tr>
+    </tbody></table><div class="empty" id="emptyState">没有找到匹配的基金</div></div>
+    <div class="table-foot"><span id="tableSummary">展示 8 只，共 8 只</span><div class="pages" id="pager"></div></div>
+  </section>
+
+  <section class="layout">
+    <article class="card panel">
+      <div class="panel-head"><div><h2 class="panel-title" id="chartTitle">组合收益走势</h2><div class="panel-sub" id="chartCaption">示例走势，不代表真实持仓表现</div></div><div class="sp-segctl segmented" id="rangeSwitch" role="group" aria-label="时间范围"><button data-range="1M">1月</button><button data-range="3M" class="active sel">3月</button><button data-range="6M">6月</button><button data-range="1Y">1年</button><button data-range="ALL">全部</button></div></div>
+      <div class="chart-summary"><div><span>区间收益</span><strong class="positive">+8.72%</strong></div><div><span>年化收益</span><strong>+12.36%</strong></div><div><span>最大回撤</span><strong class="negative">−4.18%</strong></div></div>
+      <div class="chart-wrap"><svg viewBox="0 0 720 190" role="img" aria-label="示例组合收益走势图"><defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop class="fill-stop" offset="0" stop-opacity=".14"/><stop class="fill-stop" offset="1" stop-opacity="0"/></linearGradient></defs><line class="gridline" x1="42" x2="710" y1="25" y2="25"/><line class="gridline" x1="42" x2="710" y1="65" y2="65"/><line class="gridline" x1="42" x2="710" y1="105" y2="105"/><line class="gridline" x1="42" x2="710" y1="145" y2="145"/><text class="axis" x="0" y="28">+12%</text><text class="axis" x="5" y="68">+8%</text><text class="axis" x="5" y="108">+4%</text><text class="axis" x="14" y="148">0%</text><text class="axis" x="42" y="179">07.12</text><text class="axis" x="204" y="179">08.04</text><text class="axis" x="370" y="179">08.27</text><text class="axis" x="536" y="179">09.19</text><text class="axis" x="680" y="179">10.12</text><path class="chart-area" d="M42 139 C61 136 65 118 85 124 S115 132 132 111 S155 105 172 113 S201 96 217 105 S244 94 259 87 S284 98 302 85 S328 93 348 77 S376 81 394 66 S421 73 438 62 S466 77 482 59 S510 70 527 54 S555 62 572 50 S598 63 616 41 S643 52 660 36 S690 43 710 26 L710 158 L42 158Z"/><path class="chart-line-compare" d="M42 143 C86 138 105 146 143 136 S206 142 250 129 S312 134 357 119 S420 124 466 109 S532 118 572 103 S627 110 663 92 S689 98 710 87"/><path class="chart-line" d="M42 139 C61 136 65 118 85 124 S115 132 132 111 S155 105 172 113 S201 96 217 105 S244 94 259 87 S284 98 302 85 S328 93 348 77 S376 81 394 66 S421 73 438 62 S466 77 482 59 S510 70 527 54 S555 62 572 50 S598 63 616 41 S643 52 660 36 S690 43 710 26"/></svg></div>
+      <div class="legend"><span><i></i>示例组合</span><span><i></i>沪深 300 基准</span></div>
+    </article>
+    <article class="card panel">
+      <div class="panel-head"><div><h2 class="panel-title">资产配置</h2><div class="panel-sub" id="allocationCaption">示例比例</div></div></div>
+      <div class="alloc-total"><small>总市值</small><span id="assetAllocationTotal">¥286,430</span></div>
+      <div class="alloc-list">
+        <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="32.4" style="--mfill:var(--blue-visual-color)"><span class="lab">宽基指数</span><span class="val">32.4%</span><div class="track"><div class="fill" style="width:32.4%"></div></div></div>
+        <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="23.6" style="--mfill:var(--indigo-visual-color)"><span class="lab">科技成长</span><span class="val">23.6%</span><div class="track"><div class="fill" style="width:23.6%"></div></div></div>
+        <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="18.7" style="--mfill:var(--seafoam-visual-color)"><span class="lab">消费主题</span><span class="val">18.7%</span><div class="track"><div class="fill" style="width:18.7%"></div></div></div>
+        <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="14.1" style="--mfill:var(--orange-visual-color)"><span class="lab">债券固收</span><span class="val">14.1%</span><div class="track"><div class="fill" style="width:14.1%"></div></div></div>
+        <div class="sp-progress meter alloc-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="11.2" style="--mfill:var(--gray-500)"><span class="lab">其他</span><span class="val">11.2%</span><div class="track"><div class="fill" style="width:11.2%"></div></div></div>
+      </div>
+      <div class="alloc-foot"><span>资产分散度</span><strong id="allocationFoot">示例数据</strong></div>
+    </article>
+  </section>
+  <p class="footnote" id="disclaimerText">当前是示例数据。盘中估值仅供参考，不是正式成交价格，基金净值以基金公司公布为准。分析内容不构成投资建议。</p>
+</main>
 <div class="sp-toast toast" id="toast" role="status"></div>
 <div class="modal-backdrop" id="importModal"><section class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="importTitle"><div class="modal-head"><h2 id="importTitle">从支付宝截图导入持仓</h2><button class="sp-action quiet sp-focusable modal-close" id="closeImport" aria-label="关闭"><svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button></div><p>上传支付宝「我的持有」列表截图。本机识别每只基金的名称、金额和收益，自动匹配基金代码，并按最近正式净值推算份额和成本。导入前请核对一遍。</p><div class="sp-drop upload-drop"><div class="sp-illus horizontal"><svg class="art ico" viewBox="0 0 48 48" style="width:48px;height:48px;stroke-width:2"><use href="#i-image"/></svg><div class="tx"><strong id="fileLabel">支持 PNG、JPG、WebP，最大 12 MB</strong><small>截图只在本机处理，不会上传到外部服务。</small></div></div><button class="sp-button sp-focusable v-secondary f-fill" id="chooseImage">选择截图</button></div><div class="import-status" id="importStatus" role="status"></div><div class="review-scroll"><table class="review-table"><thead><tr><th>截图识别</th><th>匹配基金</th><th>持有份额</th><th>成本净值</th><th><span class="sr-only">移除</span></th></tr></thead><tbody id="candidateRows"></tbody></table><div class="empty" id="candidateEmpty">上传截图后，识别结果会显示在这里。也可以手动添加基金。</div></div><div class="review-tools"><button class="sp-action sp-focusable" id="addCandidate">＋ 手动添加一只</button><span class="refresh-label">导入后立即估值，之后自动刷新</span></div><div class="local-note">成本净值用来计算持有盈亏。确认导入会替换当前持仓，同一代码的基金会自动合并。</div><div class="modal-actions"><button class="sp-button sp-focusable v-secondary f-outline" id="cancelImport">取消</button><button class="sp-button sp-focusable v-accent f-fill" id="saveHoldings">确认导入</button></div></section></div>
 <div class="modal-backdrop" id="holdingModal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="holdingTitle"><div class="modal-head"><h2 id="holdingTitle">新增持仓</h2><button class="sp-action quiet sp-focusable modal-close" id="closeHolding" aria-label="关闭"><svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button></div><p id="holdingHint"></p><div class="holding-summary" id="holdingSummary" hidden></div><div id="holdingFields"></div><div class="sp-alert subtle analysis-error" id="holdingError" role="alert" style="--line:var(--negative-visual-color);--subtle:var(--red-subtle-background-color-default)"></div><div class="modal-actions"><button class="sp-button sp-focusable v-secondary f-outline" id="cancelHolding">取消</button><button class="sp-button sp-focusable v-accent f-fill" id="submitHolding">保存持仓</button></div></section></div>
@@ -464,7 +412,7 @@
   const modal=$('#modal'), query=$('#queryInput'), submit=$('#submitQuery'), result=$('#analysisOutput'), errorBox=$('#analysisError');
   function openAnalysis(seed=''){modal.classList.add('open');modal.querySelector('.modal').classList.remove('has-result');result.classList.remove('visible');errorBox.classList.remove('visible');query.value=seed;setTimeout(()=>query.focus(),50)}
   function closeAnalysis(){modal.classList.remove('open')}
-  $('#analyzeBtn').addEventListener('click',()=>openAnalysis()); $('#insightAnalyze').addEventListener('click',()=>openAnalysis());
+  $('#analyzeBtn').addEventListener('click',()=>openAnalysis());
   $('#closeModal').addEventListener('click',closeAnalysis); $('#cancelModal').addEventListener('click',closeAnalysis);
   modal.addEventListener('click',e=>{if(e.target===modal)closeAnalysis()}); document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAnalysis();$('#importModal').classList.remove('open')}});
   const fmtValue=(value,digits=4)=>value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?Number(value).toFixed(digits):'数据缺失';
@@ -484,7 +432,7 @@
     finally{submit.disabled=false;submit.textContent='生成分析'}
   });
   const PAGE_SIZE=5;let currentPage=1,tableMode='demo';
-  function matchedRows(){const q=$('#tableSearch').value.trim().toLowerCase();const risk=$('#allFunds').dataset.risk||'all';return [...$('#fundRows').rows].filter(row=>{const nameHit=!q||(row.dataset.name||'').toLowerCase().includes(q);const riskHit=risk==='all'||(risk==='high'?row.querySelector('.tag.warn')!==null:row.querySelector('.tag:not(.warn)')!==null);return nameHit&&riskHit})}
+  function matchedRows(){const q=$('#tableSearch').value.trim().toLowerCase();return [...$('#fundRows').rows].filter(row=>{const nameHit=!q||(row.dataset.name||'').toLowerCase().includes(q);return nameHit})}
   function renderPager(total,matched){const pager=$('#pager');pager.replaceChildren();const nav=(label,page,{current=false,disabled=false}={})=>{const b=document.createElement('button');b.type='button';b.textContent=label;if(current)b.classList.add('current');b.disabled=disabled;b.addEventListener('click',()=>{if(disabled||current)return;currentPage=page;applyTableView()});pager.append(b)};
     nav('‹',currentPage-1,{disabled:currentPage<=1});
     let shown=[];for(let p=1;p<=total;p++)shown.push(p);
@@ -506,19 +454,22 @@
     'ALL':{gain:'+9.43%',annual:'+9.43%',drawdown:'−8.12%',dates:['2024','2025 Q1','2025 Q3','2026 Q1','2026 Q4'],path:'M42 150 C66 137 84 149 110 132 S151 142 180 118 S221 133 249 110 S289 121 319 97 S359 113 388 87 S430 102 459 73 S499 91 529 64 S568 77 598 51 S641 68 670 40 S696 47 710 28'}
   };
   $('#rangeSwitch').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;const data=rangeData[e.target.dataset.range];if(!data)return;$('#rangeSwitch').querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===e.target);b.classList.toggle('sel',b===e.target)});const line=$('.chart-line');line.setAttribute('d',data.path);$('.chart-area').setAttribute('d',`${data.path} L710 158 L42 158Z`);const metrics=$$('.chart-summary strong');metrics[0].textContent=data.gain;metrics[1].textContent=data.annual;metrics[2].textContent=data.drawdown;const dates=$$('.chart-wrap .axis').slice(4);dates.forEach((label,i)=>label.textContent=data.dates[i]||'');});
-  const destinations={'总览':'.heading','基金持仓':'.table-panel','数据分析':'.layout','研究报告':null};
-  document.querySelectorAll('.nav button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b===btn));$('#crumbView').textContent=btn.dataset.view;if(btn.dataset.view==='研究报告'){openAnalysis()}else $(destinations[btn.dataset.view]).scrollIntoView({behavior:'smooth',block:'start'})}));
   $('#fundRows').addEventListener('click',event=>{const trigger=event.target.closest('.row-menu-btn');if(trigger){event.stopPropagation();openRowMenu(trigger);return}if(!event.target.closest('.row-menu'))closeRowMenu()});
   document.addEventListener('click',event=>{if(!event.target.closest('.row-menu')&&!event.target.closest('.row-menu-btn'))closeRowMenu()});
   window.addEventListener('scroll',()=>closeRowMenu(),true);
   window.addEventListener('resize',()=>closeRowMenu());
   $('#exportBtn').addEventListener('click',()=>{const headers=['基金名称','基金代码','持有份额','成本净值','持有金额','持有盈亏','日涨跌','最新净值'];const real=lastPortfolio?.holdings?.length;const rows=real?[headers,...lastPortfolio.holdings.map(item=>[item.fund_name,item.fund_code,item.shares,item.cost_nav??'',item.market_value??'',item.pnl_amount??'',item.quote?.change_pct??'',item.quote?.nav??''])]:[['基金名称','基金代码','持有金额','持有收益','日涨跌','最新净值'],['易方达沪深300 ETF联接A','110020','82460.20','6320.40','-0.42%','1.8426'],['华夏国证半导体芯片ETF联接C','008887','56820.10','8716.80','+1.28%','1.5623'],['广发中证消费ETF联接C','009329','48260.22','-1140.32','+0.36%','0.9238'],['南方中证全债指数A','202101','40372.00','1182.00','+0.08%','1.2864'],['富国中证人工智能主题ETF联接C','012900','32518.00','5202.00','+1.26%','1.6721']];const csv='\ufeff'+rows.map(row=>row.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n');const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));link.download=real?'基金持仓.csv':'基金持仓概览-演示数据.csv';link.click();URL.revokeObjectURL(link.href);toast(real?'基金持仓已导出':'演示持仓数据已导出')});
-  $('#notify').addEventListener('click',()=>toast('当前没有新的通知'));
+  function syncPrivacy(){const on=document.documentElement.classList.contains('privacy');const b=$('#privacyToggle');b.setAttribute('aria-pressed',String(on));b.setAttribute('aria-label',on?'显示金额':'隐藏金额')}
+  syncPrivacy();
+  $('#privacyToggle').addEventListener('click',()=>{const on=document.documentElement.classList.toggle('privacy');try{localStorage.setItem('moneyAgent.privacy',on?'1':'0')}catch{}syncPrivacy();toast(on?'金额已隐藏':'金额已显示')});
+
+  // 人民币钞票上的扭索纹：几组正弦调制的极坐标曲线叠在一起，只画一次
+  (function drawGuilloche(svg){if(!svg)return;const ns='http://www.w3.org/2000/svg';
+    [[88,8,30,12],[64,10,22,10],[40,7,14,8]].forEach(([base,amp,petals,copies])=>{for(let c=0;c<copies;c++){const phase=c/copies*Math.PI*2/petals;let d='';
+      for(let i=0;i<=480;i++){const t=i/480*Math.PI*2;const r=base+amp*Math.sin(petals*t+phase*petals)*Math.cos(petals/4*t);d+=`${i?'L':'M'}${(r*Math.cos(t)).toFixed(2)} ${(r*Math.sin(t)).toFixed(2)}`}
+      const path=document.createElementNS(ns,'path');path.setAttribute('d',d+'Z');svg.append(path)}})})($('#guilloche'));
   $('#themeToggle').addEventListener('click',()=>{const next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('moneyAgent.theme',next)}catch{}toast(next==='dark'?'已切换到深色主题':'已切换到浅色主题')});
-  $('#addWatch').addEventListener('click',()=>{const name=window.prompt('输入基金名称或代码，添加到观察列表：');if(!name?.trim())return;const item=document.createElement('div');item.className='watch-item';const label=document.createElement('span');label.textContent=name.trim();const sub=document.createElement('small');sub.textContent='自定义观察';label.append(sub);const value=document.createElement('span');value.textContent='待分析';value.className='watch-pending';item.append(label,value);$('.watchlist').append(item);toast('已添加到自选观察')});
   let descending=true;$('#sortBtn').addEventListener('click',()=>{const body=$('#fundRows');[...body.rows].sort((a,b)=>{const av=Number(a.cells[1].textContent.replace(/[^\d.]/g,''));const bv=Number(b.cells[1].textContent.replace(/[^\d.]/g,''));return descending?bv-av:av-bv}).forEach(row=>body.append(row));descending=!descending;$('#sortBtn').textContent=descending?'↓ 金额降序':'↑ 金额升序';applyTableView(true)});
-  $('#allFunds').dataset.risk='all';$('#allFunds').addEventListener('click',()=>{const states=[['all','全部基金　⌄'],['high','高风险基金　⌄'],['low','低 / 中风险　⌄']];const next=(states.findIndex(([key])=>key===$('#allFunds').dataset.risk)+1)%states.length;$('#allFunds').dataset.risk=states[next][0];$('#allFunds').textContent=states[next][1];filterRows()});
-  $('#activityMore').addEventListener('click',()=>openAnalysis('请分析一只基金，并总结近期风险和行业动态'));
 
   const importModal=$('#importModal'), candidateRows=$('#candidateRows'), importStatus=$('#importStatus');
   const yuan=v=>v==null?'—':Number(v).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -577,25 +528,23 @@
       else importStatus.textContent='没有识别出基金。请上传持仓列表页的截图，或手动添加。';
       let detail=$('#ocrRaw');if(!detail){detail=document.createElement('details');detail.id='ocrRaw';detail.className='result-report';const summary=document.createElement('summary');summary.textContent='查看 OCR 识别原文';const pre=document.createElement('pre');detail.append(summary,pre);$('.import-modal .local-note').before(detail)}detail.querySelector('pre').textContent=payload.text||'没有识别到文字'}
     catch(err){importStatus.textContent=`${err.message}。确认服务已启动后，可手动添加持仓。`;candidateRows.replaceChildren();appendCandidate()}finally{e.target.value=''}});
-  $('#saveHoldings').addEventListener('click',async()=>{const holdings=[...candidateRows.rows].map(row=>Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value.trim()])));if(!holdings.length){importStatus.textContent='请先添加至少一只基金';return}if(holdings.some(item=>!/^\d{6}$/.test(item.fund_code)||!item.shares||Number(item.shares)<=0)){importStatus.textContent='请检查基金代码（6 位数字）和大于 0 的持有份额';return}const button=$('#saveHoldings');button.disabled=true;button.textContent='正在保存…';try{const response=await fetch('/api/holdings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({holdings})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'保存失败');importModal.classList.remove('open');$('#portfolioCaption').textContent='支付宝截图导入的持仓 · 估值按分钟自动刷新';$('#portfolioSelect').options[0].text='我的持仓';$('#exportBtn').lastElementChild.textContent='导出持仓';await refreshPortfolio();startPortfolioRefresh();toast(`已导入 ${payload.count} 只基金，开始获取最新估值`)}catch(err){importStatus.textContent=err.message}finally{button.disabled=false;button.textContent='确认导入'}});
+  $('#saveHoldings').addEventListener('click',async()=>{const holdings=[...candidateRows.rows].map(row=>Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value.trim()])));if(!holdings.length){importStatus.textContent='请先添加至少一只基金';return}if(holdings.some(item=>!/^\d{6}$/.test(item.fund_code)||!item.shares||Number(item.shares)<=0)){importStatus.textContent='请检查基金代码（6 位数字）和大于 0 的持有份额';return}const button=$('#saveHoldings');button.disabled=true;button.textContent='正在保存…';try{const response=await fetch('/api/holdings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({holdings})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'保存失败');importModal.classList.remove('open');await refreshPortfolio();startPortfolioRefresh();toast(`已导入 ${payload.count} 只基金，开始获取最新估值`)}catch(err){importStatus.textContent=err.message}finally{button.disabled=false;button.textContent='确认导入'}});
 
   let refreshTimer=null,lastPortfolio=null,refreshInFlight=false,lastImported=false;
   const money=value=>value==null?'—':'¥ '+Number(value).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
   function applyDirection(element,value){element.classList.remove('positive','negative');if(value==null)return;element.classList.add(Number(value)>=0?'positive':'negative')}
-  function renderImportedPortfolio(data){if(!lastImported){const total=$('#totalValue');total.replaceChildren();delete total.dataset.value;$('#portfolioSelect').options[0].text='我的持仓';$('#exportBtn').lastElementChild.textContent='导出持仓'}lastPortfolio=data;lastImported=true;const rows=data.holdings||[];const body=$('#fundRows');body.replaceChildren();$('#allFunds').dataset.risk='all';$('#allFunds').textContent='全部基金　⌄';let pnlComplete=true;let dailyPnl=0;let dailyKnown=false;
-    rows.forEach(item=>{const quote=item.quote||{},change=quote.change_pct;const tr=document.createElement('tr');tr.dataset.name=`${item.fund_name} ${item.fund_code}`.toLowerCase();const nameCell=document.createElement('td');const fundName=document.createElement('div');fundName.className='fund-name';const avatar=document.createElement('div');avatar.className='fund-avatar';avatar.textContent=(item.fund_name||'基').slice(0,1);const labels=document.createElement('div');const strong=document.createElement('strong');strong.textContent=item.fund_name||item.fund_code;const small=document.createElement('small');small.textContent=`${item.fund_code} · ${quote.nav_kind||'场外基金'}`;labels.append(strong,small);fundName.append(avatar,labels);nameCell.append(fundName);tr.append(nameCell);
+  function renderImportedPortfolio(data){if(!lastImported){const total=$('#totalValue');total.replaceChildren();delete total.dataset.value;}lastPortfolio=data;lastImported=true;const rows=data.holdings||[];const body=$('#fundRows');body.replaceChildren();let pnlComplete=true;let dailyPnl=0;let dailyKnown=false;
+    rows.forEach(item=>{const quote=item.quote||{},change=quote.change_pct;const tr=document.createElement('tr');tr.dataset.name=`${item.fund_name} ${item.fund_code}`.toLowerCase();const nameCell=document.createElement('td');const fundName=document.createElement('div');fundName.className='fund-name';const avatar=document.createElement('div');avatar.className='fund-avatar';avatar.textContent=(item.fund_name||'基').slice(0,1);const labels=document.createElement('div');const strong=document.createElement('strong');strong.textContent=item.fund_name||item.fund_code;const small=document.createElement('small');small.textContent=`${item.fund_code} · ${quote.error?'数据暂缺':`${quote.tag==='估算'?'盘中估算':'正式净值'} ${quote.nav==null?'—':fmtValue(quote.nav)}`}`;labels.append(strong,small);fundName.append(avatar,labels);nameCell.append(fundName);tr.append(nameCell);
       const valueCell=document.createElement('td');valueCell.className='mono';valueCell.textContent=money(item.market_value);const prevValue=prevRowValues[item.fund_code];if(prevValue!=null&&item.market_value!=null&&Math.abs(prevValue-item.market_value)>=0.005)valueCell.classList.add(item.market_value>prevValue?'tick-up':'tick-down');tr.append(valueCell);
       const pnlCell=document.createElement('td');if(item.pnl_amount==null){pnlComplete=false;pnlCell.textContent='待补成本';pnlCell.className='mono'}else{const amount=document.createElement('span');amount.className='change';applyDirection(amount,item.pnl_amount);amount.textContent=`${item.pnl_amount>=0?'+':'−'}${money(Math.abs(item.pnl_amount))}`;const percent=document.createElement('small');percent.className=item.pnl_amount>=0?'positive':'negative';const pct=item.cost_nav?item.pnl_amount/(item.cost_nav*item.shares)*100:null;percent.textContent=pct==null?'':fmtPct(pct);pnlCell.append(amount,document.createElement('br'),percent)}tr.append(pnlCell);
       const changeCell=document.createElement('td');const changeLabel=document.createElement('span');changeLabel.className='change';applyDirection(changeLabel,change);changeLabel.textContent=fmtPct(change);changeCell.append(changeLabel);tr.append(changeCell);
-      const navCell=document.createElement('td');navCell.className='mono';navCell.textContent=quote.nav==null?(quote.error?'获取失败':'—'):fmtValue(quote.nav);tr.append(navCell);
-      const tagCell=document.createElement('td');const tag=document.createElement('span');tag.className='tag';tag.textContent=quote.error?'数据暂缺':quote.tag==='估算'?'盘中估算':'正式净值';tagCell.append(tag);tr.append(tagCell);
       const actions=document.createElement('td');const analyze=document.createElement('button');analyze.className='row-action row-menu-btn';analyze.type='button';analyze.textContent='···';analyze.dataset.code=item.fund_code;analyze.dataset.name=item.fund_name||item.fund_code;analyze.setAttribute('aria-label',`更多操作 ${item.fund_name||item.fund_code}`);actions.append(analyze);tr.append(actions);body.append(tr);
       if(change!=null&&item.market_value!=null){dailyPnl+=item.market_value*Number(change)/(100+Number(change));dailyKnown=true}
     });
     $('#emptyState').style.display='none';$('#holdingsSubtitle').textContent='持有金额与盈亏按最新估值计算';$('#fundCount').innerHTML=`${String(rows.length).padStart(2,'0')}<small>只</small>`;$('#holdingFoot').textContent=pnlComplete?'持仓成本信息完整':'补充成本净值可计算持有盈亏';
     setOdometer($('#totalValue'),money(data.total_value));const totalPnl=$('#totalPnl');if(data.total_pnl==null){totalPnl.textContent='待补成本';totalPnl.classList.remove('positive','negative');$('#totalPnlPct').textContent='—';$('#totalPnlPct').classList.remove('positive','negative')}else{totalPnl.textContent=`${data.total_pnl>=0?'+':'−'}${money(Math.abs(data.total_pnl))}`;applyDirection(totalPnl,data.total_pnl);const pct=data.total_value&&data.total_value-data.total_pnl?data.total_pnl/(data.total_value-data.total_pnl)*100:null;$('#totalPnlPct').textContent=fmtPct(pct);applyDirection($('#totalPnlPct'),pct)}
     const today=$('#todayPnl'),todayPct=dailyKnown&&data.total_value?dailyPnl/data.total_value*100:null;today.textContent=dailyKnown?`${dailyPnl>=0?'+':'−'}${money(Math.abs(dailyPnl))}`:'—';applyDirection(today,dailyPnl);$('#todayChange').textContent=fmtPct(todayPct);applyDirection($('#todayChange'),todayPct);
-    $('#refreshLabel').classList.remove('loading');$('#refreshLabel').querySelector('span').textContent=`${data.market?.label?data.market.label+'，':''}最新刷新 ${(data.refreshed_at||'').slice(11)||'刚刚'}`;$('#refreshLabel').style.setProperty('--dot',`var(--${({open:'positive',lunch:'notice',pre:'notice'})[data.market?.phase]||'neutral'}-visual-color)`);$('#portfolioCaption').textContent='本地持仓 · 净值与盘中估算来自公开行情接口';$('#assetFoot').textContent='已按份额 × 最新估值计算';$('#assetAllocationTotal').textContent=data.total_value==null?'—':money(data.total_value);renderAllocation(rows,data.total_value);renderActivity(rows,data);$('.nav .count').textContent=String(rows.length);prevRowValues=Object.fromEntries(rows.map(r=>[r.fund_code,r.market_value]));$('#allFunds').disabled=true;$('#allFunds').textContent='风险等级待评估';$('#portfolioStatus').textContent='本地持仓已载入';$('#portfolioStatusDetail').textContent=`最近刷新 · ${data.refreshed_at||'刚刚'}\n${refreshMs?`估值每 ${refreshMs/1000} 秒自动更新`:'估值手动刷新'}` ;$('#portfolioStatusDetail').style.whiteSpace='pre-line';$('#disclaimerText').textContent='持仓、总资产、收益、资产配置、今日估值曲线和近期动态，都按你导入的基金份额和公开行情计算。盘中估值仅供参考，不是正式成交价格，基金净值以基金公司公布为准。分析内容不构成投资建议。';
+    $('#refreshLabel').classList.remove('loading');$('#refreshLabel').querySelector('span').textContent=`${data.market?.label?data.market.label+'，':''}最新刷新 ${(data.refreshed_at||'').slice(11)||'刚刚'}`;$('#refreshLabel').style.setProperty('--dot',`var(--${({open:'positive',lunch:'notice',pre:'notice'})[data.market?.phase]||'neutral'}-visual-color)`);$('#assetFoot').textContent='按持有份额 × 最新估值计算';$('#assetAllocationTotal').textContent=data.total_value==null?'—':money(data.total_value);renderAllocation(rows,data.total_value);prevRowValues=Object.fromEntries(rows.map(r=>[r.fund_code,r.market_value]));$('#disclaimerText').textContent='持仓、总资产、收益、资产配置、今日估值曲线和近期动态，都按你导入的基金份额和公开行情计算。盘中估值仅供参考，不是正式成交价格，基金净值以基金公司公布为准。分析内容不构成投资建议。';
     $('#globalSearch').dispatchEvent(new Event('input'));
     tableMode='imported';
     applyTableView(true);
@@ -624,6 +573,7 @@
       const old=cell.dataset.d;cell.dataset.d=c;const strip=cell.firstChild;if(el.dataset.fresh){strip.style.transition='none'}strip.style.transform=`translateY(${-(10+Number(c))*1.15}em)`;
       if(sameShape&&dir&&old!==c){cell.classList.remove('chg-up','chg-down');void cell.offsetWidth;cell.classList.add(dir);setTimeout(()=>cell.classList.remove(dir),900)}});
     if(el.dataset.fresh){void el.offsetWidth;cells.forEach(c=>{if(c.firstChild?.style)c.firstChild.style.transition=''});delete el.dataset.fresh}
+    if((dir||!sameShape)&&/\d/.test(text)&&!reduceMotion){el.classList.remove('shine');void el.offsetWidth;el.classList.add('shine')}
     el.dataset.value=Number.isFinite(numeric)?String(numeric):'';
   }
 
@@ -639,19 +589,6 @@
       meter.style.setProperty('--mfill',`var(${seg.name.startsWith('其他')?'--gray-500':METER_FILLS[i]})`)});
     $('#allocationCaption').textContent='按当前市值计算的各基金占比';
     $('#allocationFoot').textContent=`最大一只占 ${(valued[0].market_value/total*100).toFixed(1)}%`;
-  }
-  function renderActivity(rows,data){
-    const list=$('.activity-list');const moved=rows.filter(r=>r.quote?.change_pct!=null&&r.market_value!=null);const time=(data.refreshed_at||'').slice(11,16);
-    const impact=r=>r.market_value*Number(r.quote.change_pct)/(100+Number(r.quote.change_pct));
-    const item=(kind,title,body,note)=>{const div=document.createElement('div');div.className='activity';const ico=document.createElement('i');ico.className=`activity-ico ${kind}`;const main=document.createElement('div');main.className='activity-main';const strong=document.createElement('strong');strong.textContent=title;const small=document.createElement('small');small.textContent=note;main.append(strong,document.createTextNode(body),small);const t=document.createElement('time');t.textContent=time;div.append(ico,main,t);return div};
-    const items=[];
-    if(moved.length){const sorted=[...moved].sort((a,b)=>b.quote.change_pct-a.quote.change_pct);const best=sorted[0],worst=sorted[sorted.length-1];
-      const line=r=>`今日${r.quote.tag==='估算'?'估算':''}${fmtPct(r.quote.change_pct)}，影响 ${signedMoney(impact(r))}`;
-      items.push(item(best.quote.change_pct>=0?'up':'down',best.fund_name,line(best),`持仓市值 ${money(best.market_value)}`));
-      if(worst!==best)items.push(item(worst.quote.change_pct>=0?'up':'down',worst.fund_name,line(worst),`持仓市值 ${money(worst.market_value)}`))}
-    const est=rows.filter(r=>r.quote?.tag==='估算').length,official=rows.length-est;
-    items.push(item('note','估值口径',est?`${est} 只为盘中估算${official?`，${official} 只是正式净值`:''}`:'全部为正式净值',est?'盘中估值仅供参考，以基金公司公布的净值为准':'净值已公布，收益按正式净值计算'));
-    list.replaceChildren(...items);
   }
   const signedMoney=v=>`${v>=0?'+':'−'}${money(Math.abs(v))}`;
   let prevRowValues={};
@@ -800,7 +737,7 @@
     $('#fundRows').replaceChildren();
     $('#fundCount').innerHTML='00<small>只</small>';
     $('#holdingFoot').textContent='尚未添加持仓';
-    setOdometer($('#totalValue'),'¥ —');$('.nav .count').textContent='0';
+    setOdometer($('#totalValue'),'¥ —');
     $('#totalPnl').textContent='—';$('#totalPnl').classList.remove('positive','negative');
     $('#totalPnlPct').textContent='—';$('#totalPnlPct').classList.remove('positive','negative');
     $('#todayPnl').textContent='—';$('#todayChange').textContent='—';
